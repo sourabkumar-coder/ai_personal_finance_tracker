@@ -11,6 +11,12 @@ from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding"])
 
 
+@router.get("/students", response_model=list[StudentResponse])
+def list_students(db: Session = Depends(get_db)):
+    """List all registered student profiles."""
+    return db.query(Student).all()
+
+
 @router.post("/register", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 def register_student(student_in: StudentCreate, db: Session = Depends(get_db)):
     """Register a new student profile and initialize welcome guidance."""

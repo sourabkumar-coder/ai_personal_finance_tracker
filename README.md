@@ -87,7 +87,13 @@ personal-finance-tracker/
    pip install -r requirements.txt
    ```
 
-4. **Run the FastAPI server:**
+4. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   # Ensure GEMINI_API_KEY is configured in .env
+   ```
+
+5. **Run the FastAPI server:**
    ```bash
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```

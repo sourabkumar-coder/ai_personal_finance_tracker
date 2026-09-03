@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI-Powered Student Personal Finance Tracker equipped with dynamic budgeting, goal milestones, expenditure analytics, and Google Gemini intelligent financial recommendations.">
+  <title>Personal Finance Tracker | Smart AI Budgeting with Gemini</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">💎</div>
+        <div>
+          <div class="brand-title">SmartFinance</div>
+          <span class="brand-badge">Gemini 2.5 Inside</span>
+        </div>
+      </div>
+
+      <ul class="nav-links">
+        <li class="nav-item">
+          <button id="nav-btn-overview" class="active" onclick="switchTab('overview')">
+            <span class="nav-icon">📊</span>
+            <span>Overview</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="nav-btn-ai-advisor" onclick="switchTab('ai-advisor')">
+            <span class="nav-icon">✨</span>
+            <span>AI Advisor</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="nav-btn-expenses" onclick="switchTab('expenses')">
+            <span class="nav-icon">💸</span>
+            <span>Expenses</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="nav-btn-budgets" onclick="switchTab('budgets')">
+            <span class="nav-icon">🎯</span>
+            <span>Budgets</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="nav-btn-goals" onclick="switchTab('goals')">
+            <span class="nav-icon">🏆</span>
+            <span>Savings Goals</span>
+          </button>
+        </li>
+      </ul>
+
+      <!-- User Profile in Sidebar -->
+      <div class="user-profile-card">
+        <div class="user-info">
+          <div class="user-avatar" id="sidebar-user-avatar">AR</div>
+          <div class="user-details">
+            <h4 id="sidebar-user-name">Alex Rivera</h4>
+            <p id="sidebar-user-year">Sophomore • $650/mo</p>
+          </div>
+        </div>
+        <button id="btn-switch-user" class="switch-user-btn" onclick="openStudentModal()">Switch</button>
+      </div>
+    </aside>
+
+    <!-- Main Viewport -->
+    <div class="main-viewport">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="page-title">
+          <h1 id="top-page-heading">Financial Overview</h1>
+        </div>
+        <div class="header-actions">
+          <div class="ai-status-pill">
+            <span class="status-dot"></span>
+            <span id="ai-model-tag">Gemini 2.5 Flash Online</span>
+          </div>
+          <button id="btn-quick-log-expense" class="btn btn-primary btn-sm" onclick="openModal('modal-add-expense')">
+            <span>+ Log Expense</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Views -->
+      <main class="content-body">
+        <!-- ================= OVERVIEW TAB ================= -->
+        <section id="tab-overview" class="tab-view active">
+          <!-- Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Monthly Allowance</span>
+                <span class="metric-icon">💵</span>
+              </div>
+              <div class="metric-value" id="val-monthly-allowance">$0.00</div>
+              <div class="metric-subtext" id="val-monthly-currency">USD / Month</div>
+            </div>
+
+            <div class="metric-card warning" id="card-total-spent">
+              <div class="metric-header">
+                <span class="metric-label">Month-To-Date Spent</span>
+                <span class="metric-icon">💳</span>
+              </div>
+              <div class="metric-value" id="val-total-spent">$0.00</div>
+              <div class="metric-subtext" id="val-spent-pct">0% of allowance</div>
+            </div>
+
+            <div class="metric-card success" id="card-remaining-balance">
+              <div class="metric-header">
+                <span class="metric-label">Remaining Balance</span>
+                <span class="metric-icon">🏦</span>
+              </div>
+              <div class="metric-value" id="val-remaining-balance">$0.00</div>
+              <div class="metric-subtext" id="val-daily-budget">Safe daily spend: $0.00</div>
+            </div>
+
+            <div class="metric-card" id="card-month-end-health">
+              <div class="metric-header">
+                <span class="metric-label">Projected Status</span>
+                <span class="metric-icon">📈</span>
+              </div>
+              <div class="metric-value" id="val-health-status">Healthy</div>
+              <div class="metric-subtext" id="val-projected-burn">Forecast: $0.00 spent</div>
+            </div>
+          </div>
+
+          <!-- Top AI Recommendation Preview Banner -->
+          <div class="ai-hero-banner" id="overview-ai-banner">
+            <div class="ai-hero-content">
+              <h2>✨ Gemini AI Financial Copilot</h2>
+              <p id="overview-top-rec-text">Analyzing your active budgets and spending patterns to protect your wallet...</p>
+              <div class="ai-tags">
+                <span class="tag-badge">Smart Burn Rate</span>
+                <span class="tag-badge">Category Optimization</span>
+                <span class="tag-badge">Milestone Acceleration</span>
+              </div>
+            </div>
+            <button id="btn-view-ai-advisor" class="btn btn-magic" onclick="switchTab('ai-advisor')">
+              <span>Explore AI Insights →</span>
+            </button>
+          </div>
+
+          <!-- Two Column Grid for Breakdown & Recent Expenses -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
+            <!-- Category Breakdown -->
+            <div class="glass-card">
+              <div class="card-header-row">
+                <h3>🏷️ Category Spending</h3>
+                <span class="badge-pill" id="overview-total-categories">0 Categories</span>
+              </div>
+              <div id="overview-category-list" style="display: flex; flex-direction: column; gap: 0.85rem;">
+                <p style="color: var(--text-muted); font-size: 0.85rem;">Loading categories...</p>
+              </div>
+            </div>
+
+            <!-- Recent Expenses -->
+            <div class="glass-card">
+              <div class="card-header-row">
+                <h3>🕒 Recent Transactions</h3>
+                <button class="btn btn-secondary btn-sm" onclick="switchTab('expenses')">View All</button>
+              </div>
+              <div class="table-container">
+                <table class="data-table" id="overview-recent-table">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Category</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="overview-recent-tbody">
+                    <!-- populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= AI ADVISOR TAB ================= -->
+        <section id="tab-ai-advisor" class="tab-view">
+          <div class="ai-hero-banner">
+            <div class="ai-hero-content">
+              <h2>🤖 Google Gemini Financial Advisor</h2>
+              <p>Tailored financial wisdom generated specifically for students using your pocket money, itemized receipts, category budgets, and savings goals.</p>
+              <div class="ai-tags">
+                <span class="tag-badge" style="background: rgba(99, 102, 241, 0.2); color: #c7d2fe;">Model: gemini-2.5-flash</span>
+                <span class="tag-badge">Powered by Google GenAI</span>
+                <span class="tag-badge">Real-Time Synthesis</span>
+              </div>
+            </div>
+            <div>
+              <button id="btn-generate-ai-recs" class="btn btn-magic" onclick="triggerGenerateRecommendations()">
+                <span id="ai-generate-icon">✨</span>
+                <span id="ai-generate-text">Generate Fresh AI Advice</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Month-End Forecast Card -->
+          <div class="glass-card" style="border-left: 4px solid var(--primary);">
+            <div class="card-header-row">
+              <h3>🔮 Month-End Burn Rate Forecast</h3>
+              <span class="badge-pill" id="forecast-status-badge">Calculating...</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;" id="forecast-stats-grid">
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Days Left in Month</span>
+                <div style="font-size: 1.25rem; font-weight: 700;" id="fc-days-remaining">-</div>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Daily Burn Rate</span>
+                <div style="font-size: 1.25rem; font-weight: 700;" id="fc-burn-rate">-</div>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Projected Month-End Spend</span>
+                <div style="font-size: 1.25rem; font-weight: 700;" id="fc-projected-spent">-</div>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Projected End Balance</span>
+                <div style="font-size: 1.25rem; font-weight: 700;" id="fc-projected-balance">-</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recommendations Grid -->
+          <div class="card-header-row" style="margin-top: 1.5rem;">
+            <h3>💡 Actionable Recommendations</h3>
+            <span class="badge-pill" id="recs-count-badge">0 Suggestions</span>
+          </div>
+
+          <div class="recs-grid" id="recs-cards-container">
+            <!-- Populated dynamically -->
+          </div>
+        </section>
+
+        <!-- ================= EXPENSES TAB ================= -->
+        <section id="tab-expenses" class="tab-view">
+          <div class="glass-card">
+            <div class="card-header-row">
+              <h3>💸 All Expense Entries</h3>
+              <div style="display: flex; gap: 0.75rem;">
+                <select id="filter-expense-category" class="form-control" style="width: auto;" onchange="loadExpenses()">
+                  <option value="">All Categories</option>
+                  <option value="Food">Food</option>
+                  <option value="Books">Books</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Rent">Rent</option>
+                  <option value="Travel">Travel</option>
+                  <option value="Utilities">Utilities</option>
+                  <option value="Others">Others</option>
+                </select>
+                <button id="btn-add-expense" class="btn btn-primary btn-sm" onclick="openModal('modal-add-expense')">
+                  + Add Expense
+                </button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="expenses-full-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Method</th>
+                    <th>Notes</th>
+                    <th>Amount</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="expenses-table-tbody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= BUDGETS TAB ================= -->
+        <section id="tab-budgets" class="tab-view">
+          <div class="glass-card">
+            <div class="card-header-row">
+              <h3>🎯 Monthly Category Budgets</h3>
+              <button id="btn-open-budget-modal" class="btn btn-primary btn-sm" onclick="openModal('modal-add-budget')">
+                + Set Budget Limit
+              </button>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">
+              Set spending thresholds per category. The system alerts you automatically when you reach 80% or exceed 100% of your allowance limit.
+            </p>
+
+            <div class="cards-grid" id="budgets-container">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= GOALS TAB ================= -->
+        <section id="tab-goals" class="tab-view">
+          <div class="glass-card">
+            <div class="card-header-row">
+              <h3>🏆 Financial Savings Goals</h3>
+              <button id="btn-open-goal-modal" class="btn btn-primary btn-sm" onclick="openModal('modal-add-goal')">
+                + Create Savings Goal
+              </button>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">
+              Track milestones for tech gear, travel, emergency funds, or tuition. Make incremental deposits and monitor your target progress.
+            </p>
+
+            <div class="cards-grid" id="goals-container">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Add Expense Modal -->
+  <div class="modal-backdrop" id="modal-add-expense">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Log New Expense</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-add-expense')">&times;</button>
+      </div>
+      <form id="form-add-expense" onsubmit="handleCreateExpense(event)">
+        <div class="form-group">
+          <label for="exp-title">Title / Description</label>
+          <input type="text" id="exp-title" class="form-control" placeholder="e.g. Dining hall, Textbook, Movie" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="exp-amount">Amount ($)</label>
+            <input type="number" step="0.01" min="0.01" id="exp-amount" class="form-control" placeholder="25.00" required>
+          </div>
+          <div class="form-group">
+            <label for="exp-category">Category</label>
+            <select id="exp-category" class="form-control" required>
+              <option value="Food">Food</option>
+              <option value="Books">Books</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Rent">Rent</option>
+              <option value="Travel">Travel</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Others">Others</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="exp-date">Date</label>
+            <input type="date" id="exp-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="exp-payment">Payment Method</label>
+            <select id="exp-payment" class="form-control">
+              <option value="Card">Card</option>
+              <option value="UPI">UPI</option>
+              <option value="Cash">Cash</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="exp-notes">Notes (optional)</label>
+          <input type="text" id="exp-notes" class="form-control" placeholder="Optional details">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-expense')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Budget Modal -->
+  <div class="modal-backdrop" id="modal-add-budget">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Set Category Budget</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-add-budget')">&times;</button>
+      </div>
+      <form id="form-add-budget" onsubmit="handleCreateBudget(event)">
+        <div class="form-group">
+          <label for="bgt-category">Category</label>
+          <select id="bgt-category" class="form-control" required>
+            <option value="Food">Food</option>
+            <option value="Books">Books</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Rent">Rent</option>
+            <option value="Travel">Travel</option>
+            <option value="Utilities">Utilities</option>
+            <option value="Others">Others</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="bgt-limit">Monthly Limit ($)</label>
+          <input type="number" step="1" min="1" id="bgt-limit" class="form-control" placeholder="150" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-budget')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Set Limit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Goal Modal -->
+  <div class="modal-backdrop" id="modal-add-goal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Create Savings Goal</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-add-goal')">&times;</button>
+      </div>
+      <form id="form-add-goal" onsubmit="handleCreateGoal(event)">
+        <div class="form-group">
+          <label for="goal-title">Goal Name</label>
+          <input type="text" id="goal-title" class="form-control" placeholder="e.g. Laptop Fund, Spring Break" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="goal-target">Target Amount ($)</label>
+            <input type="number" step="1" min="1" id="goal-target" class="form-control" placeholder="800" required>
+          </div>
+          <div class="form-group">
+            <label for="goal-initial">Current Amount ($)</label>
+            <input type="number" step="1" min="0" id="goal-initial" class="form-control" value="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="goal-deadline">Target Deadline</label>
+          <input type="date" id="goal-deadline" class="form-control" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-goal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Goal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Deposit Funds Modal -->
+  <div class="modal-backdrop" id="modal-deposit-goal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Deposit to Savings Goal</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-deposit-goal')">&times;</button>
+      </div>
+      <form id="form-deposit-goal" onsubmit="handleDepositGoal(event)">
+        <input type="hidden" id="deposit-goal-id">
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem;" id="deposit-goal-name">
+          Depositing funds towards goal...
+        </p>
+        <div class="form-group">
+          <label for="deposit-amount">Deposit Amount ($)</label>
+          <input type="number" step="0.50" min="0.50" id="deposit-amount" class="form-control" placeholder="50.00" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-deposit-goal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm Deposit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Student Switch/Profile Modal -->
+  <div class="modal-backdrop" id="modal-student">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Select or Create Student</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-student')">&times;</button>
+      </div>
+      <div style="margin-bottom: 1.5rem;">
+        <label style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.4rem; display: block;">Switch Active Student:</label>
+        <select id="select-active-student" class="form-control" onchange="onStudentSelectChanged(this.value)">
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 1.25rem 0;">
+
+      <h4 style="font-size: 0.95rem; margin-bottom: 0.85rem;">Or Register New Student:</h4>
+      <form id="form-register-student" onsubmit="handleRegisterStudent(event)">
+        <div class="form-group">
+          <label for="stud-name">Full Name</label>
+          <input type="text" id="stud-name" class="form-control" placeholder="e.g. Jordan Smith" required>
+        </div>
+        <div class="form-group">
+          <label for="stud-email">College Email</label>
+          <input type="email" id="stud-email" class="form-control" placeholder="jordan@college.edu" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="stud-allowance">Monthly Pocket Money ($)</label>
+            <input type="number" min="10" step="10" id="stud-allowance" class="form-control" placeholder="500" required>
+          </div>
+          <div class="form-group">
+            <label for="stud-year">College Year</label>
+            <select id="stud-year" class="form-control">
+              <option value="Freshman">Freshman</option>
+              <option value="Sophomore">Sophomore</option>
+              <option value="Junior">Junior</option>
+              <option value="Senior">Senior</option>
+              <option value="Graduate">Graduate</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-student')">Close</button>
+          <button type="submit" class="btn btn-primary">Create Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
