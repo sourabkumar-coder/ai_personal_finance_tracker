@@ -1,4 +1,5 @@
 from typing import List, Dict, Any
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database.models import Budget, Expense
 from app.utils.helpers import get_current_month_range
@@ -23,12 +24,12 @@ class BudgetService:
 
         statuses = []
         for b in budgets:
-            # Query expenses in this category and date range
+            # Query expenses matching category (case-insensitive) in date range
             expenses = (
                 db.query(Expense)
                 .filter(
                     Expense.student_id == student_id,
-                    Expense.category == b.category,
+                    func.lower(Expense.category) == func.lower(b.category),
                     Expense.date >= start_date,
                     Expense.date <= end_date,
                 )
@@ -49,8 +50,8 @@ class BudgetService:
                 "budget_id": b.id,
                 "category": b.category,
                 "monthly_limit": b.monthly_limit,
-                "total_spent": total_spent,
-                "remaining": remaining,
+                "total_spent": round(total_spent, 2),
+                "remaining": round(remaining, 2),
                 "percentage_used": percentage,
                 "status": status,
             })

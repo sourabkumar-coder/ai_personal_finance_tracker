@@ -1,6 +1,19 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from typing import Optional, Annotated
+from pydantic import BaseModel, Field, ConfigDict, StringConstraints
+
+try:
+    import email_validator  # noqa: F401
+    from pydantic import EmailStr
+except ImportError:
+    EmailStr = Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True,
+            to_lower=True,
+            pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$",
+        ),
+    ]
 
 
 class StudentBase(BaseModel):
@@ -16,10 +29,11 @@ class StudentCreate(StudentBase):
 
 
 class StudentUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    monthly_allowance: Optional[float] = Field(None, ge=0.0)
-    currency: Optional[str] = Field(None, max_length=10)
-    college_year: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100, examples=["Alex Johnson"])
+    email: Optional[EmailStr] = Field(None, examples=["alex_new@university.edu"])
+    monthly_allowance: Optional[float] = Field(None, ge=0.0, examples=[600.0])
+    currency: Optional[str] = Field(None, max_length=10, examples=["USD"])
+    college_year: Optional[str] = Field(None, examples=["Junior"])
 
 
 class StudentResponse(StudentBase):

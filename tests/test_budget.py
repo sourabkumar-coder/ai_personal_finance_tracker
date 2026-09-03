@@ -22,15 +22,16 @@ def test_set_and_get_budget(client):
     )
     assert b_res.status_code == 201
     assert b_res.json()["monthly_limit"] == 250.0
+    budget_id = b_res.json()["id"]
 
-    # Add an expense in Food
+    # Add an expense in food (lowercase to test case-insensitivity)
     client.post(
         "/api/expenses/",
         json={
             "student_id": student_id,
             "title": "Grocery store",
             "amount": 100.0,
-            "category": "Food",
+            "category": "food",
         },
     )
 
@@ -43,3 +44,11 @@ def test_set_and_get_budget(client):
     assert statuses[0]["remaining"] == 150.0
     assert statuses[0]["percentage_used"] == 40.0
     assert statuses[0]["status"] == "Normal"
+
+    # Delete budget
+    del_res = client.delete(f"/api/budgets/{budget_id}")
+    assert del_res.status_code == 204
+
+    # Verify deleted
+    all_b = client.get(f"/api/budgets/{student_id}")
+    assert len(all_b.json()) == 0

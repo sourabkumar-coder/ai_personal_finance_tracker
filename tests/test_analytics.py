@@ -45,3 +45,8 @@ def test_analytics_overview_and_breakdown(client):
     # Education should be top since 200 > 50
     assert breakdown[0]["category"] == "Education"
     assert breakdown[0]["amount"] == 200.0
+
+
+def test_analytics_student_not_found(client):
+    res = client.get("/api/analytics/9999/overview")
+    assert res.status_code == 404

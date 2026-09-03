@@ -28,6 +28,39 @@ def test_create_and_list_expenses(client):
     assert len(res.json()) == 1
 
 
+def test_update_and_get_single_expense(client):
+    reg = client.post(
+        "/api/onboarding/register",
+        json={"name": "David", "email": "david@school.edu", "monthly_allowance": 300.0},
+    )
+    student_id = reg.json()["id"]
+
+    exp = client.post(
+        "/api/expenses/",
+        json={
+            "student_id": student_id,
+            "title": "Notebook",
+            "amount": 10.0,
+            "category": "Stationery",
+        },
+    )
+    expense_id = exp.json()["id"]
+
+    # Get single item
+    item_res = client.get(f"/api/expenses/item/{expense_id}")
+    assert item_res.status_code == 200
+    assert item_res.json()["title"] == "Notebook"
+
+    # Update expense
+    update_res = client.patch(
+        f"/api/expenses/{expense_id}",
+        json={"amount": 12.5, "notes": "Spiral bound"},
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["amount"] == 12.5
+    assert update_res.json()["notes"] == "Spiral bound"
+
+
 def test_delete_expense(client):
     reg = client.post(
         "/api/onboarding/register",
