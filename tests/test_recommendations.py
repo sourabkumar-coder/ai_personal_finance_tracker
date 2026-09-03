@@ -1,3 +1,6 @@
+from app.ai.recommendation_engine import RecommendationEngine
+
+
 def test_recommendation_and_forecast_flow(client):
     # Register student
     reg = client.post(
@@ -32,8 +35,7 @@ def test_recommendation_and_forecast_flow(client):
     assert gen_res.status_code == 200
     recs = gen_res.json()
     assert len(recs) >= 1
-    # 800 out of 1000 is 80% (>75%), so High Burn Rate alert should trigger
-    assert any("Burn Rate" in r["title"] for r in recs)
+    assert all("title" in r and "message" in r and "category" in r for r in recs)
 
     # Test marking recommendation as read
     rec_id = recs[0]["id"]
@@ -62,6 +64,25 @@ def test_recommendation_and_forecast_flow(client):
     assert "daily_burn_rate" in forecast
     assert "projected_month_end_spent" in forecast
     assert forecast["current_spent"] == 800.0
+
+
+def test_rule_based_recommendations_fallback():
+    student_data = {"name": "Test Student", "monthly_allowance": 500.0, "currency": "USD"}
+    expenses = [{"amount": 400.0, "category": "Food"}]
+    budgets = [{"category": "Food", "monthly_limit": 300.0}]
+    goals = [{"title": "Trip", "target_amount": 1000.0, "current_amount": 850.0, "status": "In Progress"}]
+
+    recs = RecommendationEngine._generate_rule_based_recommendations(
+        student_data=student_data,
+        expenses=expenses,
+        budgets=budgets,
+        goals=goals,
+    )
+    assert len(recs) >= 1
+    titles = [r["title"] for r in recs]
+    assert any("Burn Rate" in t for t in titles)
+    assert any("Budget Exceeded" in t for t in titles)
+    assert any("Goal Almost Complete" in t for t in titles)
 
 
 def test_recommendation_student_not_found(client):
