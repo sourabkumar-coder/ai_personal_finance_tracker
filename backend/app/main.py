@@ -1,5 +1,14 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Load environment variables from .env files
+load_dotenv()
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(backend_dir, ".env"))
+load_dotenv(os.path.join(os.path.dirname(backend_dir), ".env"))
+
 from app.database.database import Base, engine
 from app.routers import (
     onboarding_router,
