@@ -1,4 +1,3 @@
-from datetime import date
 from typing import List, Dict, Any
 
 
@@ -16,8 +15,8 @@ class RecommendationEngine:
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         recommendations = []
-        allowance = student_data.get("monthly_allowance", 0.0)
-        total_spent = sum(e.get("amount", 0.0) for e in expenses)
+        allowance = float(student_data.get("monthly_allowance") or 0.0)
+        total_spent = sum(float(e.get("amount") or 0.0) for e in expenses)
 
         # Rule 1: High Burn Rate Check
         if allowance > 0 and total_spent > allowance * 0.75:
@@ -25,7 +24,7 @@ class RecommendationEngine:
             recommendations.append({
                 "title": "High Monthly Burn Rate Alert",
                 "message": (
-                    f"You have already spent {burn_pct}% of your monthly allowance ({allowance}). "
+                    f"You have already spent {burn_pct}% of your monthly allowance ({allowance:.2f}). "
                     "Consider slowing discretionary spending for the rest of the month."
                 ),
                 "category": "Overall Budget",
@@ -34,37 +33,44 @@ class RecommendationEngine:
 
         # Rule 2: Category Budget Threshold Detection
         for b in budgets:
-            cat = b.get("category")
-            limit = b.get("monthly_limit", 0.0)
+            cat = str(b.get("category") or "").strip()
+            limit = float(b.get("monthly_limit") or 0.0)
+            if not cat or limit <= 0:
+                continue
+
             spent_in_cat = sum(
-                e.get("amount", 0.0) for e in expenses if e.get("category", "").lower() == cat.lower()
+                float(e.get("amount") or 0.0)
+                for e in expenses
+                if str(e.get("category") or "").strip().lower() == cat.lower()
             )
-            if limit > 0:
-                usage = (spent_in_cat / limit) * 100
-                if usage >= 100:
-                    recommendations.append({
-                        "title": f"Budget Exceeded in {cat}",
-                        "message": (
-                            f"You have spent {spent_in_cat:.2f} out of your {limit:.2f} limit "
-                            f"({usage:.1f}% used). Freeze non-essential purchases in {cat}."
-                        ),
-                        "category": cat,
-                        "impact_level": "High",
-                    })
-                elif usage >= 80:
-                    recommendations.append({
-                        "title": f"{cat} Budget Threshold Warning",
-                        "message": (
-                            f"You have reached {usage:.1f}% of your budget for {cat}. "
-                            f"Only {limit - spent_in_cat:.2f} remains."
-                        ),
-                        "category": cat,
-                        "impact_level": "Medium",
-                    })
+
+            usage = (spent_in_cat / limit) * 100
+            if usage >= 100:
+                recommendations.append({
+                    "title": f"Budget Exceeded in {cat}",
+                    "message": (
+                        f"You have spent {spent_in_cat:.2f} out of your {limit:.2f} limit "
+                        f"({usage:.1f}% used). Freeze non-essential purchases in {cat}."
+                    ),
+                    "category": cat,
+                    "impact_level": "High",
+                })
+            elif usage >= 80:
+                recommendations.append({
+                    "title": f"{cat} Budget Threshold Warning",
+                    "message": (
+                        f"You have reached {usage:.1f}% of your budget for {cat}. "
+                        f"Only {limit - spent_in_cat:.2f} remains."
+                    ),
+                    "category": cat,
+                    "impact_level": "Medium",
+                })
 
         # Rule 3: Food & Dining Out Optimization
         food_spent = sum(
-            e.get("amount", 0.0) for e in expenses if e.get("category", "").lower() in ["food", "dining", "takeout"]
+            float(e.get("amount") or 0.0)
+            for e in expenses
+            if str(e.get("category") or "").strip().lower() in ["food", "dining", "takeout", "groceries"]
         )
         if allowance > 0 and (food_spent / allowance) > 0.40:
             recommendations.append({
@@ -79,12 +85,12 @@ class RecommendationEngine:
 
         # Rule 4: Savings Goal Acceleration
         for g in goals:
-            current = g.get("current_amount", 0.0)
-            target = g.get("target_amount", 0.0)
+            current = float(g.get("current_amount") or 0.0)
+            target = float(g.get("target_amount") or 0.0)
             status = g.get("status", "In Progress")
             if status == "In Progress" and target > 0:
                 progress = (current / target) * 100
-                if progress >= 80 and progress < 100:
+                if 80 <= progress < 100:
                     recommendations.append({
                         "title": f"Goal Almost Complete: {g.get('title')}",
                         "message": (

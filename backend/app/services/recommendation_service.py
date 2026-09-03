@@ -64,11 +64,12 @@ class RecommendationService:
             goals=goals_dicts,
         )
 
-        # Clear older unread recommendations for this student and persist new ones
+        # Clear older unread AI recommendations (preserve welcome onboarding recommendation)
         db.query(Recommendation).filter(
             Recommendation.student_id == student_id,
-            Recommendation.is_read == False,
-        ).delete()
+            Recommendation.is_read.is_(False),
+            Recommendation.category != "Onboarding",
+        ).delete(synchronize_session=False)
 
         created_recs = []
         for r in recs_data:

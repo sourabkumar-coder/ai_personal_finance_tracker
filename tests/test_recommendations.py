@@ -41,6 +41,20 @@ def test_recommendation_and_forecast_flow(client):
     assert read_res.status_code == 200
     assert read_res.json()["is_read"] is True
 
+    # Test unread_only filter
+    unread_res = client.get(f"/api/recommendations/{student_id}?unread_only=true")
+    assert unread_res.status_code == 200
+    assert all(r["is_read"] is False for r in unread_res.json())
+
+    # Test mark-all-as-read
+    read_all_res = client.patch(f"/api/recommendations/{student_id}/read-all")
+    assert read_all_res.status_code == 200
+    assert read_all_res.json()["status"] == "success"
+
+    # Test deleting a recommendation
+    del_res = client.delete(f"/api/recommendations/{rec_id}")
+    assert del_res.status_code == 204
+
     # Test forecast endpoint
     forecast_res = client.get(f"/api/recommendations/{student_id}/forecast")
     assert forecast_res.status_code == 200
@@ -48,3 +62,8 @@ def test_recommendation_and_forecast_flow(client):
     assert "daily_burn_rate" in forecast
     assert "projected_month_end_spent" in forecast
     assert forecast["current_spent"] == 800.0
+
+
+def test_recommendation_student_not_found(client):
+    res = client.get("/api/recommendations/9999")
+    assert res.status_code == 404

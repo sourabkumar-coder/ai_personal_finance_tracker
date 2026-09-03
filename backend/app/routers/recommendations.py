@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import Recommendation, Student
@@ -23,16 +23,15 @@ def _verify_student(student_id: int, db: Session) -> Student:
 @router.get("/{student_id}", response_model=List[RecommendationResponse])
 def get_recommendations(
     student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
+    unread_only: bool = Query(False, description="Filter to only unread recommendations"),
     db: Session = Depends(get_db),
 ):
-    """Retrieve saved recommendations for a student."""
+    """Retrieve saved recommendations for a student with optional unread filter."""
     _verify_student(student_id, db)
-    return (
-        db.query(Recommendation)
-        .filter(Recommendation.student_id == student_id)
-        .order_by(Recommendation.created_at.desc())
-        .all()
-    )
+    query = db.query(Recommendation).filter(Recommendation.student_id == student_id)
+    if unread_only:
+        query = query.filter(Recommendation.is_read.is_(False))
+    return query.order_by(Recommendation.created_at.desc()).all()
 
 
 @router.post("/{student_id}/generate", response_model=List[RecommendationResponse])
@@ -55,12 +54,31 @@ def forecast_month_end(
     return PredictionService.forecast_month_end(db, student_id=student_id)
 
 
+@router.patch("/{student_id}/read-all", response_model=Dict[str, Any])
+def mark_all_as_read(
+    student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
+    db: Session = Depends(get_db),
+):
+    """Mark all unread recommendations for a student as read."""
+    _verify_student(student_id, db)
+    updated_count = (
+        db.query(Recommendation)
+        .filter(
+            Recommendation.student_id == student_id,
+            Recommendation.is_read.is_(False),
+        )
+        .update({"is_read": True}, synchronize_session=False)
+    )
+    db.commit()
+    return {"status": "success", "marked_read_count": updated_count}
+
+
 @router.patch("/{recommendation_id}/read", response_model=RecommendationResponse)
 def mark_as_read(
     recommendation_id: int = Path(..., gt=0, description="The ID of the recommendation", examples=[1]),
     db: Session = Depends(get_db),
 ):
-    """Mark recommendation notification as read."""
+    """Mark a single recommendation notification as read."""
     rec = db.query(Recommendation).filter(Recommendation.id == recommendation_id).first()
     if not rec:
         raise HTTPException(

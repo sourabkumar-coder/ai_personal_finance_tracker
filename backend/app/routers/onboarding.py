@@ -25,7 +25,12 @@ def register_student(student_in: StudentCreate, db: Session = Depends(get_db)):
         )
 
     student_data = student_in.model_dump()
+    student_data["name"] = student_data["name"].strip()
     student_data["email"] = clean_email
+    student_data["currency"] = (student_data.get("currency") or "USD").strip().upper()
+    if student_data.get("college_year"):
+        student_data["college_year"] = student_data["college_year"].strip()
+
     student = Student(**student_data)
 
     try:
@@ -127,6 +132,12 @@ def update_student_profile(
                 detail="This email address is already in use by another account.",
             )
         update_data["email"] = clean_email
+    if "name" in update_data and update_data["name"]:
+        update_data["name"] = update_data["name"].strip()
+    if "currency" in update_data and update_data["currency"]:
+        update_data["currency"] = update_data["currency"].strip().upper()
+    if "college_year" in update_data and update_data["college_year"]:
+        update_data["college_year"] = update_data["college_year"].strip()
 
     for key, value in update_data.items():
         setattr(student, key, value)
