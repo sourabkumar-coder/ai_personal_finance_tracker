@@ -71,8 +71,12 @@ class RecommendationEngine:
         budgets: List[Dict[str, Any]],
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        model = getattr(settings, "gemini_model", "gemini-2.5-flash") or "gemini-2.5-flash"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        configured_model = getattr(settings, "gemini_model", "gemini-2.0-flash") or "gemini-2.0-flash"
+        if configured_model == "gemini-2.5-flash":
+            configured_model = "gemini-2.0-flash"
+
+        candidate_models = [configured_model, "gemini-2.0-flash", "gemini-1.5-flash"]
+        models_to_try = list(dict.fromkeys(candidate_models))
 
         allowance = float(student_data.get("monthly_allowance") or 0.0)
         currency = str(student_data.get("currency") or "USD")
@@ -138,34 +142,42 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
             },
         }
 
-        with httpx.Client(timeout=12.0) as client:
-            resp = client.post(url, json=payload)
-            if resp.status_code != 200:
-                logger.warning(f"Gemini API returned status code {resp.status_code}: {resp.text[:200]}")
-                return []
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            try:
+                with httpx.Client(timeout=12.0) as client:
+                    resp = client.post(url, json=payload)
+                    if resp.status_code != 200:
+                        logger.warning(f"Gemini API ({model}) returned status code {resp.status_code}: {resp.text[:200]}")
+                        continue
 
-            data = resp.json()
-            candidates = data.get("candidates", [])
-            if not candidates:
-                return []
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if not candidates:
+                        continue
 
-            content_text = candidates[0]["content"]["parts"][0]["text"]
-            parsed_recs = json.loads(content_text)
+                    content_text = candidates[0]["content"]["parts"][0]["text"]
+                    parsed_recs = json.loads(content_text)
 
-            # Validate list structure
-            clean_recs = []
-            if isinstance(parsed_recs, list):
-                for item in parsed_recs:
-                    if isinstance(item, dict) and "title" in item and "message" in item:
-                        clean_recs.append({
-                            "title": str(item.get("title") or "Financial Insight")[:200],
-                            "message": str(item.get("message") or ""),
-                            "category": str(item.get("category") or "General")[:100],
-                            "impact_level": str(item.get("impact_level") or "Medium").capitalize()
-                            if str(item.get("impact_level") or "").lower() in ["low", "medium", "high"]
-                            else "Medium",
-                        })
-            return clean_recs
+                    clean_recs = []
+                    if isinstance(parsed_recs, list):
+                        for item in parsed_recs:
+                            if isinstance(item, dict) and "title" in item and "message" in item:
+                                clean_recs.append({
+                                    "title": str(item.get("title") or "Financial Insight")[:200],
+                                    "message": str(item.get("message") or ""),
+                                    "category": str(item.get("category") or "General")[:100],
+                                    "impact_level": str(item.get("impact_level") or "Medium").capitalize()
+                                    if str(item.get("impact_level") or "").lower() in ["low", "medium", "high"]
+                                    else "Medium",
+                                })
+                    if clean_recs:
+                        return clean_recs
+            except Exception as e:
+                logger.warning(f"Error invoking Gemini model {model}: {e}")
+                continue
+
+        return []
 
     @classmethod
     def generate_gemini_recommendations(
