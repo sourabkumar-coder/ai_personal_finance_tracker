@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/expenses", tags=["Expenses"])
 
 @router.post("/", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 def create_expense(expense_in: ExpenseCreate, db: Session = Depends(get_db)):
-    """Log a new expense entry for a student."""
+    """Log a new expense entry (category, title/item, amount, date) for a student and store in SQLite DB."""
     student = db.query(Student).filter(Student.id == expense_in.student_id).first()
     if not student:
         raise HTTPException(
@@ -29,21 +29,6 @@ def create_expense(expense_in: ExpenseCreate, db: Session = Depends(get_db)):
     return expense
 
 
-@router.get("/item/{expense_id}", response_model=ExpenseResponse)
-def get_single_expense(
-    expense_id: int = Path(..., gt=0, description="The ID of the expense", examples=[1]),
-    db: Session = Depends(get_db),
-):
-    """Retrieve a single expense record by ID."""
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    if not expense:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Expense with ID {expense_id} not found.",
-        )
-    return expense
-
-
 @router.get("/{student_id}", response_model=List[ExpenseResponse])
 def get_student_expenses(
     student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
@@ -53,7 +38,7 @@ def get_student_expenses(
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     db: Session = Depends(get_db),
 ):
-    """List expenses for a student with optional category and date filtering."""
+    """Retrieve all expenses logged by a student."""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -87,7 +72,7 @@ def update_expense(
     expense_id: int = Path(..., gt=0, description="The ID of the expense to update", examples=[1]),
     db: Session = Depends(get_db),
 ):
-    """Update an expense record (supports PUT and PATCH)."""
+    """Update an expense record by expense ID."""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(
@@ -114,7 +99,7 @@ def delete_expense(
     expense_id: int = Path(..., gt=0, description="The ID of the expense to delete", examples=[1]),
     db: Session = Depends(get_db),
 ):
-    """Delete an expense record."""
+    """Delete an expense record by expense ID."""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(
