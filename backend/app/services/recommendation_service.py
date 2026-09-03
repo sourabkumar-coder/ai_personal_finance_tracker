@@ -75,10 +75,10 @@ class RecommendationService:
         for r in recs_data:
             rec = Recommendation(
                 student_id=student_id,
-                title=r["title"],
-                message=r["message"],
-                category=r["category"],
-                impact_level=r["impact_level"],
+                title=str(r.get("title", "Financial Tip"))[:200],
+                message=str(r.get("message", "")),
+                category=str(r.get("category", "General"))[:100],
+                impact_level=str(r.get("impact_level", "Medium"))[:20],
                 is_read=False,
             )
             db.add(rec)

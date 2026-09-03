@@ -1,8 +1,9 @@
 import os
 import json
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import httpx
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,13 @@ class RecommendationEngine:
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         api_key = os.getenv("GEMINI_API_KEY")
-        if api_key and api_key != "your_gemini_api_key_here":
+        if not api_key and settings and hasattr(settings, "gemini_api_key"):
+            api_key = settings.gemini_api_key
+
+        if api_key and api_key.strip() and api_key.strip() != "your_gemini_api_key_here":
             try:
                 gemini_recs = cls._generate_gemini_recommendations(
-                    api_key=api_key,
+                    api_key=api_key.strip(),
                     student_data=student_data,
                     expenses=expenses,
                     budgets=budgets,
@@ -56,7 +60,8 @@ class RecommendationEngine:
         budgets: List[Dict[str, Any]],
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        model = getattr(settings, "gemini_model", "gemini-2.5-flash") or "gemini-2.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
         allowance = float(student_data.get("monthly_allowance") or 0.0)
         currency = str(student_data.get("currency") or "USD")
@@ -150,6 +155,30 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
                             else "Medium",
                         })
             return clean_recs
+
+    @classmethod
+    def generate_gemini_recommendations(
+        cls,
+        student_data: Dict[str, Any],
+        expenses: List[Dict[str, Any]],
+        budgets: List[Dict[str, Any]],
+        goals: List[Dict[str, Any]],
+        api_key: Optional[str] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        if not api_key:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key and settings and hasattr(settings, "gemini_api_key"):
+                api_key = settings.gemini_api_key
+        if not api_key or api_key == "your_gemini_api_key_here":
+            return None
+        recs = cls._generate_gemini_recommendations(
+            api_key=api_key,
+            student_data=student_data,
+            expenses=expenses,
+            budgets=budgets,
+            goals=goals,
+        )
+        return recs if recs else None
 
     @classmethod
     def _generate_rule_based_recommendations(
@@ -259,3 +288,18 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
             })
 
         return recommendations
+
+    @classmethod
+    def generate_rule_based_recommendations(
+        cls,
+        student_data: Dict[str, Any],
+        expenses: List[Dict[str, Any]],
+        budgets: List[Dict[str, Any]],
+        goals: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        return cls._generate_rule_based_recommendations(
+            student_data=student_data,
+            expenses=expenses,
+            budgets=budgets,
+            goals=goals,
+        )
