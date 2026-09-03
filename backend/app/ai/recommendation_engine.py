@@ -3,6 +3,13 @@ import json
 import logging
 from typing import List, Dict, Any
 import httpx
+from dotenv import load_dotenv
+
+# Ensure environment variables are loaded
+load_dotenv()
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+load_dotenv(os.path.join(backend_dir, ".env"))
+load_dotenv(os.path.join(os.path.dirname(backend_dir), ".env"))
 
 logger = logging.getLogger(__name__)
 
