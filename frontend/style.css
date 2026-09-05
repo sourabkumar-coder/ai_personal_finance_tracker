@@ -907,3 +907,193 @@ body {
     display: none;
   }
 }
+
+/* ==========================================================================
+   Automatic UPI & Bank Detection Components
+   ========================================================================== */
+
+.auto-tracking-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.tracking-banner-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.tracking-status-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tracking-pulse-dot {
+  width: 12px;
+  height: 12px;
+  background-color: var(--accent-emerald);
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 0 10px var(--accent-emerald);
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.badge-status-online {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-full);
+}
+
+.tracking-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.last-detected-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.last-detected-box .label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.last-detected-box .val {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.badge-auto-detected {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.55rem;
+  background: rgba(6, 182, 212, 0.12);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  border-radius: var(--radius-full);
+}
+
+.badge-source-app {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-left: 0.3rem;
+}
+
+.preset-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.preset-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.preset-chip:hover {
+  border-color: var(--primary);
+  color: #fff;
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.settings-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-card-item:last-child {
+  border-bottom: none;
+}
+
+.settings-text h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.settings-text p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* iOS-style toggle switch */
+.switch-toggle {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.switch-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(255, 255, 255, 0.12);
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 26px;
+  border: 1px solid var(--border-subtle);
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #fff;
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+}
+
+.switch-toggle input:checked + .switch-slider {
+  background-color: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+}
+
+.switch-toggle input:checked + .switch-slider:before {
+  transform: translateX(22px);
+}
+

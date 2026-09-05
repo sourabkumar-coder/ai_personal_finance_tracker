@@ -53,6 +53,12 @@
             <span>Savings Goals</span>
           </button>
         </li>
+        <li class="nav-item">
+          <button id="nav-btn-auto-tracking" onclick="switchTab('auto-tracking')">
+            <span class="nav-icon">⚡</span>
+            <span>Auto-Tracking</span>
+          </button>
+        </li>
       </ul>
 
       <!-- User Profile in Sidebar -->
@@ -80,6 +86,9 @@
             <span class="status-dot"></span>
             <span id="ai-model-tag">Gemini 2.5 Flash Online</span>
           </div>
+          <button id="btn-header-simulate" class="btn btn-magic btn-sm" onclick="openModal('modal-simulate-notification')">
+            <span>⚡ Simulate UPI</span>
+          </button>
           <button id="btn-quick-log-expense" class="btn btn-primary btn-sm" onclick="openModal('modal-add-expense')">
             <span>+ Log Expense</span>
           </button>
@@ -90,6 +99,32 @@
       <main class="content-body">
         <!-- ================= OVERVIEW TAB ================= -->
         <section id="tab-overview" class="tab-view active">
+          <!-- Automatic Tracking Live Status Banner -->
+          <div class="glass-card auto-tracking-banner" id="auto-tracking-widget">
+            <div class="tracking-banner-main">
+              <div class="tracking-status-left">
+                <div class="tracking-pulse-dot"></div>
+                <div>
+                  <h3 style="margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                    ⚡ Automatic UPI & Bank Detection
+                    <span class="badge-status-online" id="tracking-status-pill">● Active</span>
+                  </h3>
+                  <p style="margin: 0.25rem 0 0 0; color: var(--text-muted); font-size: 0.85rem;" id="tracking-status-desc">
+                    Connected with Android Companion • Monitoring GPay, PhonePe, Paytm, BHIM & Bank SMS
+                  </p>
+                </div>
+              </div>
+              <div class="tracking-actions-right">
+                <div class="last-detected-box">
+                  <span class="label">Last Detected:</span>
+                  <span class="val" id="tracking-last-detected-val">Waiting for transactions...</span>
+                </div>
+                <button class="btn btn-magic btn-sm" onclick="openModal('modal-simulate-notification')">
+                  <span>⚡ Test UPI Payment</span>
+                </button>
+              </div>
+            </div>
+          </div>
           <!-- Metrics Grid -->
           <div class="metrics-grid">
             <div class="metric-card">
@@ -319,11 +354,186 @@
             </div>
           </div>
         </section>
+
+        <!-- ================= AUTO-TRACKING TAB ================= -->
+        <section id="tab-auto-tracking" class="tab-view">
+          <div class="glass-card" style="border-left: 4px solid var(--accent-emerald);">
+            <div class="card-header-row">
+              <div>
+                <h2>⚡ Automatic UPI & Bank Expense Detection</h2>
+                <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.25rem;">
+                  <strong>"Pay. We track it."</strong> Zero-effort student expense tracking powered by our Android Companion App and AI classification.
+                </p>
+              </div>
+              <span class="badge-status-online" id="auto-tracking-pill-lg">● Companion Connected</span>
+            </div>
+          </div>
+
+          <!-- 3-Column Highlights -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-top: 1.25rem;">
+            <div class="glass-card">
+              <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">📱</div>
+              <h4 style="margin-bottom: 0.35rem;">Android Companion</h4>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">
+                Runs natively on Android using <code>NotificationListenerService</code> with user permission. Monitors GPay, PhonePe, Paytm, BHIM and banking SMS without accessing internal app data.
+              </p>
+            </div>
+            <div class="glass-card">
+              <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">🛡️</div>
+              <h4 style="margin-bottom: 0.35rem;">Multi-Stage Pipeline</h4>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">
+                App filter &rarr; signal detector &rarr; amount &amp; merchant extractor &rarr; status verification &rarr; duplicate prevention window &rarr; AI categorizer.
+              </p>
+            </div>
+            <div class="glass-card">
+              <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">🧠</div>
+              <h4 style="margin-bottom: 0.35rem;">Adaptive AI Learning</h4>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">
+                Combines user preference feedback (e.g. Amazon &rarr; Education) with an Indian student merchant dictionary and Gemini 2.5 Flash for novel merchants.
+              </p>
+            </div>
+          </div>
+
+          <!-- Settings & Supported Apps Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+            <!-- Settings Card -->
+            <div class="glass-card">
+              <div class="card-header-row">
+                <h3>⚙️ Tracking Preferences</h3>
+                <span class="badge-pill">Synced</span>
+              </div>
+              
+              <div class="settings-card-item">
+                <div class="settings-text">
+                  <h4>Automatic Expense Tracking</h4>
+                  <p>Detect and record expenses automatically from incoming notifications.</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="toggle-auto-tracking" checked onchange="handleToggleSetting('auto_tracking_enabled', this.checked)">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-card-item">
+                <div class="settings-text">
+                  <h4>AI Categorization</h4>
+                  <p>Automatically predict category and subcategory using AI heuristics.</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="toggle-auto-categorize" checked onchange="handleToggleSetting('auto_categorize_enabled', this.checked)">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-card-item">
+                <div class="settings-text">
+                  <h4>Confirm Uncertain Expenses</h4>
+                  <p>Prompt for manual confirmation when AI confidence is below 70%.</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="toggle-require-confirm" checked onchange="handleToggleSetting('require_confirmation_low_confidence', this.checked)">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Supported Apps Card -->
+            <div class="glass-card">
+              <div class="card-header-row">
+                <h3>💳 Supported Financial Apps</h3>
+                <span class="badge-pill">10+ Monitored</span>
+              </div>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                The companion app detects payment confirmations and debit alerts from:
+              </p>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> Google Pay (GPay)
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> PhonePe
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> Paytm Payments
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> BHIM NPCI UPI
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> SBI YONO / SMS
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> HDFC Bank App/SMS
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> ICICI iMobile
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> Axis Mobile
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> Kotak 811
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem;">
+                  <span style="color: var(--accent-emerald);">✓</span> Amazon Pay UPI
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
 
   <!-- ================= MODALS ================= -->
+
+  <!-- Simulate UPI Notification Modal -->
+  <div class="modal-backdrop" id="modal-simulate-notification">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>⚡ Simulate UPI / Bank Notification</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-simulate-notification')">&times;</button>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+        Click any preset or enter a real payment notification text to test the automatic detection pipeline in real-time.
+      </p>
+
+      <label style="font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Quick Presets:</label>
+      <div class="preset-chip-list">
+        <button type="button" class="preset-chip" onclick="fillSimulationPreset('Payment of ₹350 to Zomato successful', 'PhonePe')">🍕 Zomato ₹350 (Food)</button>
+        <button type="button" class="preset-chip" onclick="fillSimulationPreset('You paid ₹1200 to Amazon', 'Google Pay')">📦 Amazon ₹1,200 (Shopping)</button>
+        <button type="button" class="preset-chip" onclick="fillSimulationPreset('Paid ₹220 to Uber via UPI Ref 987654321012', 'Google Pay')">🚕 Uber ₹220 (Transport)</button>
+        <button type="button" class="preset-chip" onclick="fillSimulationPreset('₹500 received from Rahul', 'Paytm')">💰 Rahul ₹500 (Income)</button>
+        <button type="button" class="preset-chip" onclick="fillSimulationPreset('Your payment of ₹800 failed', 'PhonePe')">❌ Failed ₹800 (Reject)</button>
+        <button type="button" class="preset-chip" onclick="fillSimulationPreset('Your account balance is ₹8,450', 'HDFC Bank')">🏦 Balance Alert (Ignore)</button>
+      </div>
+
+      <form id="form-simulate-notification" onsubmit="handleSimulateNotification(event)">
+        <div class="form-group">
+          <label for="sim-text">Notification Text</label>
+          <input type="text" id="sim-text" class="form-control" placeholder="e.g. Payment of ₹350 to Zomato successful" required>
+        </div>
+        <div class="form-group">
+          <label for="sim-source">Source Application</label>
+          <select id="sim-source" class="form-control">
+            <option value="PhonePe">PhonePe</option>
+            <option value="Google Pay">Google Pay</option>
+            <option value="Paytm">Paytm</option>
+            <option value="BHIM">BHIM UPI</option>
+            <option value="HDFC Bank">HDFC Bank</option>
+            <option value="SBI YONO">SBI YONO</option>
+            <option value="Axis Mobile">Axis Mobile</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-simulate-notification')">Cancel</button>
+          <button type="submit" class="btn btn-magic" id="btn-submit-simulate">
+            <span>⚡ Trigger Detection</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Add Expense Modal -->
   <div class="modal-backdrop" id="modal-add-expense">

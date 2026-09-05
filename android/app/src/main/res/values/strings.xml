@@ -1,0 +1,38 @@
+<resources>
+    <string name="app_name">SmartFinance Tracker</string>
+    <string name="notification_listener_name">SmartFinance UPI Notification Listener</string>
+    
+    <!-- Dashboard Strings -->
+    <string name="title_dashboard">Auto-Detection Companion</string>
+    <string name="subtitle_dashboard">Zero-friction UPI &amp; Bank expense tracking for students</string>
+    <string name="status_active">Auto-Tracking Active</string>
+    <string name="status_inactive">Permission Required</string>
+    <string name="status_desc_active">Listening for UPI and Bank transaction notifications in the background.</string>
+    <string name="status_desc_inactive">Grant Notification Access to automatically log payments from Google Pay, PhonePe, Paytm, and Banks.</string>
+    <string name="btn_grant_permission">Grant Notification Access</string>
+    <string name="btn_test_notification">Simulate Test Payment</string>
+    <string name="btn_configure_server">Server &amp; Student Settings</string>
+    <string name="btn_learn_more">Privacy &amp; Permissions</string>
+    
+    <!-- Cards & Sections -->
+    <string name="header_last_detected">Last Detected Transaction</string>
+    <string name="no_transactions_yet">No transactions detected yet. Make a payment via UPI or tap \"Simulate Test Payment\" to test.</string>
+    <string name="header_supported_apps">Supported Payment Apps</string>
+    <string name="supported_apps_sub">Google Pay, PhonePe, Paytm, BHIM, HDFC, SBI, ICICI, Axis, Kotak</string>
+    
+    <!-- Onboarding / Privacy -->
+    <string name="title_onboarding">Privacy First Auto-Tracking</string>
+    <string name="privacy_point_1">🔒 Only payment debit/credit notifications are read</string>
+    <string name="privacy_point_2">❌ Personal messages (WhatsApp, SMS, Emails) are NEVER accessed</string>
+    <string name="privacy_point_3">❌ OTPs, passwords, and sensitive balances are completely ignored</string>
+    <string name="privacy_point_4">⚡ Instant AI categorization updates your web dashboard in real time</string>
+    <string name="btn_enable_tracking">Enable Notification Access</string>
+    <string name="btn_done">Back to Dashboard</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_settings_title">Backend Configuration</string>
+    <string name="label_server_url">Backend API Base URL</string>
+    <string name="label_student_id">Student ID</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_cancel">Cancel</string>
+</resources>

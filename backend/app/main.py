@@ -10,6 +10,7 @@ load_dotenv(os.path.join(backend_dir, ".env"))
 load_dotenv(os.path.join(os.path.dirname(backend_dir), ".env"))
 
 from app.database.database import Base, engine
+from app.database.migration import run_migrations
 from app.routers import (
     onboarding_router,
     expenses_router,
@@ -17,10 +18,12 @@ from app.routers import (
     goals_router,
     analytics_router,
     recommendations_router,
+    transactions_router,
 )
 
-# Initialize database tables
+# Initialize database tables and run idempotent schema migrations
 Base.metadata.create_all(bind=engine)
+run_migrations(engine)
 
 app = FastAPI(
     title="Personal Finance Tracker API",
@@ -44,6 +47,7 @@ app.include_router(budgets_router)
 app.include_router(goals_router)
 app.include_router(analytics_router)
 app.include_router(recommendations_router)
+app.include_router(transactions_router)
 
 
 @app.get("/", tags=["Health"])

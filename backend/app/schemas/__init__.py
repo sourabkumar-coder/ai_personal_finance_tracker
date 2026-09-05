@@ -5,6 +5,16 @@ from app.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse, Budge
 from app.schemas.goal import GoalCreate, GoalUpdate, GoalDeposit, GoalResponse
 from app.schemas.recommendation import RecommendationCreate, RecommendationResponse
 
+from app.schemas.transaction import (
+    AutoDetectRequest,
+    AutoDetectResponse,
+    SimulateNotificationRequest,
+    ConfirmCategoryRequest,
+    StudentSettingsResponse,
+    StudentSettingsUpdate,
+    TrackingStatusResponse,
+)
+
 __all__ = [
     "StudentCreate",
     "StudentUpdate",
@@ -23,4 +33,11 @@ __all__ = [
     "GoalResponse",
     "RecommendationCreate",
     "RecommendationResponse",
+    "AutoDetectRequest",
+    "AutoDetectResponse",
+    "SimulateNotificationRequest",
+    "ConfirmCategoryRequest",
+    "StudentSettingsResponse",
+    "StudentSettingsUpdate",
+    "TrackingStatusResponse",
 ]

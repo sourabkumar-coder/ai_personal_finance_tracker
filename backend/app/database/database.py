@@ -4,7 +4,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Path to database file inside backend/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'finance.db')}")
+# Default to backend/finance.db to avoid database path confusion
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(BASE_DIR), "backend", "finance.db")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
 engine = create_engine(
     DATABASE_URL,

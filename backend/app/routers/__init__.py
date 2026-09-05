@@ -5,6 +5,7 @@ from app.routers.budgets import router as budgets_router
 from app.routers.goals import router as goals_router
 from app.routers.analytics import router as analytics_router
 from app.routers.recommendations import router as recommendations_router
+from app.routers.transactions import router as transactions_router
 
 __all__ = [
     "onboarding_router",
@@ -13,4 +14,5 @@ __all__ = [
     "goals_router",
     "analytics_router",
     "recommendations_router",
+    "transactions_router",
 ]
