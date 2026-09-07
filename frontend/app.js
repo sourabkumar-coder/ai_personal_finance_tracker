@@ -5,7 +5,7 @@
  */
 
 // Configuration
-const API_BASE = "http://localhost:8000";
+const API_BASE = "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
 // Global State
 let currentStudentId = parseInt(localStorage.getItem("activeStudentId")) || 0;
