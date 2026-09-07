@@ -27,7 +27,7 @@ def register_student(student_in: StudentCreate, db: Session = Depends(get_db)):
     student_data = student_in.model_dump()
     student_data["name"] = student_data["name"].strip()
     student_data["email"] = clean_email
-    student_data["currency"] = (student_data.get("currency") or "USD").strip().upper()
+    student_data["currency"] = (student_data.get("currency") or "INR").strip().upper()
     if student_data.get("college_year"):
         student_data["college_year"] = student_data["college_year"].strip()
 

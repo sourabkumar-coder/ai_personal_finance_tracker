@@ -5,7 +5,7 @@ def test_register_student(client):
             "name": "Sarah Connor",
             "email": "sarah@university.edu",
             "monthly_allowance": 600.0,
-            "currency": "USD",
+            "currency": "INR",
             "college_year": "Junior",
         },
     )

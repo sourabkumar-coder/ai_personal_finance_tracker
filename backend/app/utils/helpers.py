@@ -2,7 +2,7 @@ from datetime import date
 import calendar
 
 
-def format_currency(amount: float, currency: str = "USD") -> str:
+def format_currency(amount: float, currency: str = "INR") -> str:
     """Format a numeric amount as a readable currency string."""
     return f"{currency} {amount:,.2f}"
 

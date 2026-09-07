@@ -73,7 +73,7 @@ def test_recommendation_and_forecast_flow(client, monkeypatch):
 
 
 def test_rule_based_recommendations_fallback():
-    student_data = {"name": "Test Student", "monthly_allowance": 500.0, "currency": "USD"}
+    student_data = {"name": "Test Student", "monthly_allowance": 500.0, "currency": "INR"}
     expenses = [{"amount": 400.0, "category": "Food"}]
     budgets = [{"category": "Food", "monthly_limit": 300.0}]
     goals = [{"title": "Trip", "target_amount": 1000.0, "current_amount": 850.0, "status": "In Progress"}]
@@ -163,7 +163,7 @@ def test_recommendations_api_flow(client, monkeypatch):
             "name": "David Miller",
             "email": "david@university.edu",
             "monthly_allowance": 500.0,
-            "currency": "USD",
+            "currency": "INR",
         },
     )
     assert reg.status_code == 201

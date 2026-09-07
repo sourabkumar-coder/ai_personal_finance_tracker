@@ -22,8 +22,8 @@ def seed_demo_data_if_empty(db: Session = None):
         student = Student(
             name="Alex Rivera",
             email="alex.rivera@university.edu",
-            monthly_allowance=650.0,
-            currency="USD",
+            monthly_allowance=12000.0,
+            currency="INR",
             college_year="Sophomore",
         )
         db.add(student)

@@ -26,7 +26,7 @@ class Student(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(150), unique=True, index=True, nullable=False)
     monthly_allowance = Column(Float, default=0.0, nullable=False)
-    currency = Column(String(10), default="USD", nullable=False)
+    currency = Column(String(10), default="INR", nullable=False)
     college_year = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=utc_now)
 

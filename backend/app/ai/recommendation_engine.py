@@ -79,7 +79,7 @@ class RecommendationEngine:
         models_to_try = list(dict.fromkeys(candidate_models))
 
         allowance = float(student_data.get("monthly_allowance") or 0.0)
-        currency = str(student_data.get("currency") or "USD")
+        currency = str(student_data.get("currency") or "INR")
         student_name = str(student_data.get("name") or "Student")
         total_spent = sum(float(e.get("amount") or 0.0) for e in expenses)
 
