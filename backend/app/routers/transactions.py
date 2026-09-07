@@ -23,6 +23,7 @@ from app.schemas.transaction import (
 from app.ai.transaction_parser import TransactionParser, SUPPORTED_PACKAGES, SUPPORTED_APP_NAMES
 from app.ai.transaction_categorizer import TransactionCategorizer
 from app.services.deduplication_service import DeduplicationService
+from app.services.budget_service import BudgetService
 
 router = APIRouter(prefix="/api/transactions", tags=["Automatic Transactions"])
 
@@ -200,6 +201,11 @@ def auto_detect_transaction(payload: AutoDetectRequest, db: Session = Depends(ge
     db.commit()
     db.refresh(expense)
 
+    alert = BudgetService.check_budget_exceeded(
+        db, student_id=student.id, category=category, date_val=txn_date
+    )
+    alert_model = BudgetAlertResponse.model_validate(alert) if alert else None
+
     return AutoDetectResponse(
         success=True,
         is_duplicate=False,
@@ -213,6 +219,7 @@ def auto_detect_transaction(payload: AutoDetectRequest, db: Session = Depends(ge
             "confidence": confidence,
             "source_app": source_app,
         },
+        budget_alert=alert_model,
     )
 
 

@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field, ConfigDict
 from app.schemas.expense import ExpenseResponse
+from app.schemas.budget import BudgetAlertResponse
 
 
 class AutoDetectRequest(BaseModel):
@@ -36,6 +37,7 @@ class AutoDetectResponse(BaseModel):
     ignore_reason: Optional[str] = None
     expense: Optional[ExpenseResponse] = None
     parsed_details: Optional[Dict[str, Any]] = None
+    budget_alert: Optional[BudgetAlertResponse] = None
 
 
 class SimulateNotificationRequest(BaseModel):

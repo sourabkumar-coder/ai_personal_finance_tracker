@@ -18,6 +18,7 @@ def _verify_student(student_id: int, db: Session) -> Student:
     return student
 
 
+@router.get("/{student_id}", response_model=Dict[str, Any])
 @router.get("/{student_id}/overview", response_model=Dict[str, Any])
 def get_analytics_overview(
     student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),

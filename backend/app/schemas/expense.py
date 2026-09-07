@@ -45,10 +45,14 @@ class ExpenseUpdate(BaseModel):
     is_automatically_detected: Optional[bool] = None
 
 
+from app.schemas.budget import BudgetAlertResponse
+
+
 class ExpenseResponse(ExpenseBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    budget_alert: Optional[BudgetAlertResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import Expense, Student
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseResponse
+from app.schemas.budget import BudgetAlertResponse
+from app.services.budget_service import BudgetService
 
 router = APIRouter(prefix="/api/expenses", tags=["Expenses"])
 
@@ -26,7 +28,15 @@ def create_expense(expense_in: ExpenseCreate, db: Session = Depends(get_db)):
     db.add(expense)
     db.commit()
     db.refresh(expense)
-    return expense
+
+    # Check for budget limit warning or exceeded status
+    alert = BudgetService.check_budget_exceeded(
+        db, student_id=expense.student_id, category=expense.category, date_val=expense.date
+    )
+    res = ExpenseResponse.model_validate(expense)
+    if alert:
+        res.budget_alert = BudgetAlertResponse.model_validate(alert)
+    return res
 
 
 @router.get("/{student_id}", response_model=List[ExpenseResponse])
@@ -91,7 +101,14 @@ def update_expense(
 
     db.commit()
     db.refresh(expense)
-    return expense
+
+    alert = BudgetService.check_budget_exceeded(
+        db, student_id=expense.student_id, category=expense.category, date_val=expense.date
+    )
+    res = ExpenseResponse.model_validate(expense)
+    if alert:
+        res.budget_alert = BudgetAlertResponse.model_validate(alert)
+    return res
 
 
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)

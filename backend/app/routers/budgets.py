@@ -4,7 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import Budget, Student
-from app.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse, BudgetStatusResponse
+from app.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse, BudgetStatusResponse, BudgetAlertResponse
 from app.services.budget_service import BudgetService
 
 router = APIRouter(prefix="/api/budgets", tags=["Budgets"])
@@ -80,6 +80,21 @@ def get_budget_statuses(
             detail=f"Student with ID {student_id} not found.",
         )
     return BudgetService.get_budget_statuses(db, student_id=student_id, year=year, month=month)
+
+
+@router.get("/{student_id}/alerts", response_model=List[BudgetAlertResponse])
+def get_budget_alerts(
+    student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
+    db: Session = Depends(get_db),
+):
+    """Retrieve active budget exceeded or near-limit warning alerts for a student."""
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student with ID {student_id} not found.",
+        )
+    return BudgetService.get_budget_alerts(db, student_id=student_id)
 
 
 @router.delete("/{budget_id}", status_code=status.HTTP_204_NO_CONTENT)

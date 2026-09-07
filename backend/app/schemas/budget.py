@@ -34,3 +34,15 @@ class BudgetStatusResponse(BaseModel):
     remaining: float
     percentage_used: float
     status: str  # Normal, Warning, Exceeded
+
+
+class BudgetAlertResponse(BaseModel):
+    is_exceeded: bool
+    is_warning: bool
+    category: str
+    monthly_limit: float
+    total_spent: float
+    remaining: float
+    percentage_used: float
+    message: str
+

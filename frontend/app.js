@@ -91,15 +91,20 @@ async function checkNewTransactions() {
       const newest = expenses[0]; // Newest first
       if (newest && newest.is_automatically_detected) {
         showToast(
-          "⚡ New Transaction Auto-Detected!",
+          "New Transaction Auto-Detected!",
           `${currencySymbol}${newest.amount.toFixed(2)} at ${newest.merchant || newest.title} categorized as ${newest.category}`,
           "success"
         );
         // Refresh overview and tracking status
         loadOverview();
         loadTrackingStatus();
+        loadBudgetAlerts();
+        loadRecommendations();
         if (document.getElementById("tab-expenses").classList.contains("active")) {
           loadExpenses();
+        }
+        if (document.getElementById("tab-budgets").classList.contains("active")) {
+          loadBudgets();
         }
       }
     }
@@ -113,6 +118,7 @@ async function checkNewTransactions() {
  * Load all views for the active student.
  */
 function loadAllViews() {
+  loadBudgetAlerts();
   loadOverview();
   loadTrackingStatus();
   loadExpenses();
@@ -120,6 +126,84 @@ function loadAllViews() {
   loadGoals();
   loadRecommendations();
   loadTrackingSettings();
+}
+
+/**
+ * Load & Render Active Budget Exceeded / Warning Banners
+ */
+async function loadBudgetAlerts() {
+  if (!currentStudentId || currentStudentId <= 0) return;
+  const banner = document.getElementById("budget-alert-banner");
+  if (!banner) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/budgets/${currentStudentId}/alerts`);
+    if (!res.ok) {
+      banner.style.display = "none";
+      return;
+    }
+    const alerts = await res.json();
+
+    if (!alerts || alerts.length === 0) {
+      banner.style.display = "none";
+      banner.innerHTML = "";
+      return;
+    }
+
+    const firstExceeded = alerts.find((a) => a.is_exceeded) || alerts[0];
+    const className = firstExceeded.is_exceeded ? "alert-banner-exceeded" : "alert-banner-warning";
+    const alertTitle = firstExceeded.is_exceeded
+      ? `Budget Limit Exceeded in ${escapeHtml(firstExceeded.category)}!`
+      : `Approaching Budget Limit in ${escapeHtml(firstExceeded.category)}`;
+
+    banner.className = className;
+    banner.style.display = "flex";
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 0.85rem;">
+        <div>
+          <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-main);">${alertTitle}</h4>
+          <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-muted);">${escapeHtml(firstExceeded.message)}</p>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-sm" style="flex-shrink: 0;" onclick="switchTab('budgets')">View Budgets</button>
+    `;
+  } catch (e) {
+    console.error("Error loading budget alerts:", e);
+    banner.style.display = "none";
+  }
+}
+
+/**
+ * Handle Real-Time Budget Alert Notification Trigger
+ */
+function checkAndShowBudgetAlert(budgetAlert) {
+  if (!budgetAlert) return;
+
+  const isExceeded = budgetAlert.is_exceeded;
+  const isWarning = budgetAlert.is_warning;
+  if (!isExceeded && !isWarning) return;
+
+  const title = isExceeded ? "BUDGET EXCEEDED ALERT!" : "Budget Warning";
+  const toastType = isExceeded ? "error" : "info";
+
+  // Trigger Toast Notification
+  showToast(title, budgetAlert.message, toastType);
+
+  // Trigger Native Desktop Notification if granted
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, {
+        body: budgetAlert.message,
+        tag: `budget-alert-${budgetAlert.category}`,
+      });
+    } catch (e) {
+      console.warn("Desktop notification trigger error:", e);
+    }
+  }
+
+  loadBudgetAlerts();
+  loadRecommendations();
+  loadBudgets();
 }
 
 /**
@@ -176,8 +260,8 @@ async function loadOverview() {
       updateSidebarProfile();
     }
 
-    // 2. Analytics
-    const analyticsRes = await fetch(`${API_BASE}/api/analytics/${currentStudentId}`);
+    // 2. Analytics Overview
+    const analyticsRes = await fetch(`${API_BASE}/api/analytics/${currentStudentId}/overview`);
     if (analyticsRes.ok) {
       const a = await analyticsRes.json();
       const allowance = a.monthly_allowance || 0.0;
@@ -185,20 +269,34 @@ async function loadOverview() {
       const remaining = a.remaining_balance || 0.0;
       const pct = allowance > 0 ? ((spent / allowance) * 100).toFixed(1) : 0;
 
-      document.getElementById("val-monthly-allowance").textContent = `${currencySymbol}${allowance.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-      document.getElementById("val-monthly-currency").textContent = `${currentCurrency} / Month`;
-      document.getElementById("val-total-spent").textContent = `${currencySymbol}${spent.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-      document.getElementById("val-spent-pct").textContent = `${pct}% of monthly allowance`;
-      document.getElementById("val-remaining-balance").textContent = `${currencySymbol}${remaining.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+      const elAllowance = document.getElementById("val-monthly-allowance");
+      if (elAllowance) elAllowance.textContent = `${currencySymbol}${allowance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+      const elCurrency = document.getElementById("val-monthly-currency");
+      if (elCurrency) elCurrency.textContent = `${currentCurrency} / Month`;
+
+      const elSpent = document.getElementById("val-total-spent");
+      if (elSpent) elSpent.textContent = `${currencySymbol}${spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+      const elSpentPct = document.getElementById("val-spent-pct");
+      if (elSpentPct) elSpentPct.textContent = `${pct}% of monthly allowance`;
+
+      const elRemaining = document.getElementById("val-remaining-balance");
+      if (elRemaining) elRemaining.textContent = `${currencySymbol}${remaining.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
       const daysInMonth = 30;
       const day = new Date().getDate();
       const daysLeft = Math.max(1, daysInMonth - day);
       const safeDaily = remaining > 0 ? (remaining / daysLeft).toFixed(2) : "0.00";
-      document.getElementById("val-daily-budget").textContent = `Safe daily spend: ${currencySymbol}${safeDaily}`;
+      const elDaily = document.getElementById("val-daily-budget");
+      if (elDaily) elDaily.textContent = `Safe daily spend: ${currencySymbol}${safeDaily}`;
+    }
 
-      // Render Category Breakdown
-      renderCategoryList(a.category_spending || {});
+    // 2b. Category Breakdown
+    const catRes = await fetch(`${API_BASE}/api/analytics/${currentStudentId}/by-category`);
+    if (catRes.ok) {
+      const catData = await catRes.json();
+      renderCategoryList(catData);
     }
 
     // 3. Forecast
@@ -236,7 +334,13 @@ function renderCategoryList(catSpend) {
   const countBadge = document.getElementById("overview-total-categories");
   if (!container) return;
 
-  const entries = Object.entries(catSpend);
+  let entries = [];
+  if (Array.isArray(catSpend)) {
+    entries = catSpend.map((item) => [item.category, item.amount]);
+  } else if (typeof catSpend === "object" && catSpend !== null) {
+    entries = Object.entries(catSpend);
+  }
+
   if (countBadge) countBadge.textContent = `${entries.length} Categories`;
 
   if (entries.length === 0) {
@@ -251,7 +355,7 @@ function renderCategoryList(catSpend) {
       return `
         <div>
           <div style="display: flex; justify-content: space-between; font-size: 0.84rem; margin-bottom: 0.25rem;">
-            <span>${cat}</span>
+            <span>${escapeHtml(cat)}</span>
             <span style="font-weight: 600;">${currencySymbol}${val.toFixed(2)}</span>
           </div>
           <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
@@ -261,6 +365,52 @@ function renderCategoryList(catSpend) {
       `;
     })
     .join("");
+}
+
+/**
+ * Edit Monthly Allowance Modal Functions
+ */
+function openEditAllowanceModal() {
+  if (!currentStudent) return;
+  const inputAmt = document.getElementById("edit-allowance-amount");
+  const inputCurr = document.getElementById("edit-allowance-currency");
+  if (inputAmt) inputAmt.value = currentStudent.monthly_allowance || 0;
+  if (inputCurr) inputCurr.value = currentStudent.currency || "INR";
+  openModal("modal-edit-allowance");
+}
+
+async function handleUpdateAllowance(e) {
+  e.preventDefault();
+  if (!currentStudentId || currentStudentId <= 0) return;
+
+  const allowance = parseFloat(document.getElementById("edit-allowance-amount").value);
+  const currency = document.getElementById("edit-allowance-currency").value;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/onboarding/profile/${currentStudentId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        monthly_allowance: allowance,
+        currency: currency,
+      }),
+    });
+
+    if (res.ok) {
+      currentStudent = await res.json();
+      currentCurrency = currentStudent.currency || "INR";
+      currencySymbol = currentCurrency === "INR" ? "₹" : "$";
+      showToast("Allowance Updated", `Monthly allowance set to ${currencySymbol}${allowance.toFixed(2)}.`, "success");
+      closeModal("modal-edit-allowance");
+      updateSidebarProfile();
+      loadOverview();
+      loadBudgets();
+    } else {
+      showToast("Error", "Could not update monthly allowance.", "error");
+    }
+  } catch (err) {
+    showToast("Error", "Network error updating allowance.", "error");
+  }
 }
 
 /**
@@ -278,7 +428,7 @@ function renderRecentTable(expenses) {
   tbody.innerHTML = expenses
     .map((e) => {
       const autoBadge = e.is_automatically_detected
-        ? `<span class="badge-auto-detected" title="${e.notes || ''}">⚡ Auto • ${e.source_app || 'UPI'}</span>`
+        ? `<span class="badge-auto-detected" title="${e.notes || ''}">Auto • ${e.source_app || 'UPI'}</span>`
         : "";
       return `
         <tr>
@@ -410,7 +560,7 @@ async function loadExpenses() {
     tbody.innerHTML = expenses
       .map((e) => {
         const autoBadge = e.is_automatically_detected
-          ? `<span class="badge-auto-detected">⚡ ${e.source_app || 'UPI'}</span>`
+          ? `<span class="badge-auto-detected">Auto • ${e.source_app || 'UPI'}</span>`
           : `<span style="font-size: 0.75rem; color: var(--text-dim);">${escapeHtml(e.payment_method || 'Manual')}</span>`;
 
         return `
@@ -452,6 +602,7 @@ async function handleDeleteExpense(expenseId) {
       showToast("Deleted", "Expense entry removed.", "info");
       loadExpenses();
       loadOverview();
+      loadBudgets();
     }
   } catch (err) {
     showToast("Error", "Could not delete expense.", "error");
@@ -459,7 +610,7 @@ async function handleDeleteExpense(expenseId) {
 }
 
 /**
- * Load Category Budgets
+ * Load Category Budgets with Live Spending Status
  */
 async function loadBudgets() {
   if (!currentStudentId || currentStudentId <= 0) {
@@ -470,7 +621,7 @@ async function loadBudgets() {
   if (!container) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/budgets/${currentStudentId}`);
+    const res = await fetch(`${API_BASE}/api/budgets/${currentStudentId}/status`);
     if (!res.ok) return;
     const budgets = await res.json();
 
@@ -481,16 +632,33 @@ async function loadBudgets() {
 
     container.innerHTML = budgets
       .map((b) => {
-        const spent = b.spent || 0.0;
+        const spent = b.total_spent || 0.0;
         const limit = b.monthly_limit || 1.0;
-        const pct = Math.min(100, Math.round((spent / limit) * 100));
-        const color = pct >= 100 ? "var(--accent-rose)" : pct >= 80 ? "var(--accent-amber)" : "var(--accent-emerald)";
+        const remaining = b.remaining !== undefined ? b.remaining : Math.max(0, limit - spent);
+        const pct = Math.min(100, Math.round(b.percentage_used || 0));
+        const color = b.status === "Exceeded" || pct >= 100 
+          ? "var(--accent-rose)" 
+          : b.status === "Warning" || pct >= 80 
+          ? "var(--accent-amber)" 
+          : "var(--accent-emerald)";
+
+        const statusLabel = b.status === "Exceeded" 
+          ? `Exceeded (${pct}%)` 
+          : b.status === "Warning" 
+          ? `Near Limit (${pct}%)` 
+          : `${pct}% Used`;
+
+        const isExceeded = b.status === "Exceeded" || pct >= 100;
+        const cardClass = isExceeded ? "glass-card budget-card-exceeded" : "glass-card";
 
         return `
-          <div class="glass-card">
+          <div class="${cardClass}" style="position: relative;">
             <div class="card-header-row">
               <h4>${escapeHtml(b.category)}</h4>
-              <span class="badge-pill" style="color: ${color};">${pct}% Used</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="badge-pill" style="color: ${color};">${statusLabel}</span>
+                <button onclick="handleDeleteBudget(${b.budget_id})" title="Delete Budget" style="background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 4px;">&times;</button>
+              </div>
             </div>
             <div style="font-size: 1.25rem; font-weight: 700; margin: 0.5rem 0;">
               ${currencySymbol}${spent.toFixed(2)} <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 400;">/ ${currencySymbol}${limit.toFixed(2)}</span>
@@ -498,12 +666,32 @@ async function loadBudgets() {
             <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin-top: 0.5rem;">
               <div style="width: ${pct}%; height: 100%; background: ${color}; border-radius: 4px;"></div>
             </div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.65rem; display: flex; justify-content: space-between;">
+              <span>Remaining: ${currencySymbol}${remaining.toFixed(2)}</span>
+              <span>${pct}% used</span>
+            </div>
           </div>
         `;
       })
       .join("");
   } catch (err) {
     console.error("Error loading budgets:", err);
+  }
+}
+
+/**
+ * Handle Delete Budget Limit
+ */
+async function handleDeleteBudget(budgetId) {
+  if (!confirm("Are you sure you want to delete this budget limit?")) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/budgets/${budgetId}`, { method: "DELETE" });
+    if (res.ok) {
+      showToast("Budget Removed", "Category budget limit deleted.", "info");
+      loadBudgets();
+    }
+  } catch (err) {
+    showToast("Error", "Could not delete budget limit.", "error");
   }
 }
 
@@ -614,12 +802,12 @@ async function triggerGenerateRecommendations() {
   const btnText = document.getElementById("ai-generate-text");
   const btnIcon = document.getElementById("ai-generate-icon");
   if (btnText) btnText.textContent = "Analyzing Habits with Gemini...";
-  if (btnIcon) btnIcon.textContent = "⏳";
+  if (btnIcon) btnIcon.textContent = "";
 
   try {
     const res = await fetch(`${API_BASE}/api/recommendations/${currentStudentId}/generate`, { method: "POST" });
     if (res.ok) {
-      showToast("✨ AI Recommendations Updated", "Fresh financial advice generated from your recent habits.", "success");
+      showToast("AI Recommendations Updated", "Fresh financial advice generated from your recent habits.", "success");
       loadRecommendations();
     } else {
       showToast("Generation Error", "Could not generate recommendations.", "error");
@@ -628,7 +816,7 @@ async function triggerGenerateRecommendations() {
     showToast("Network Error", "Failed to connect to recommendation service.", "error");
   } finally {
     if (btnText) btnText.textContent = "Generate Fresh AI Advice";
-    if (btnIcon) btnIcon.textContent = "✨";
+    if (btnIcon) btnIcon.textContent = "";
   }
 }
 
@@ -688,7 +876,7 @@ async function handleSimulateNotification(e) {
 
     if (data.success && !data.is_duplicate) {
       showToast(
-        "⚡ Transaction Detected & Recorded!",
+        "Transaction Detected & Recorded!",
         `${currencySymbol}${data.expense.amount.toFixed(2)} at ${data.expense.merchant || data.expense.title} categorized as ${data.expense.category}`,
         "success"
       );
@@ -697,16 +885,22 @@ async function handleSimulateNotification(e) {
       loadOverview();
       loadExpenses();
       loadTrackingStatus();
+      loadBudgets();
+      if (data.budget_alert) {
+        checkAndShowBudgetAlert(data.budget_alert);
+      } else {
+        loadBudgetAlerts();
+      }
     } else if (data.is_duplicate) {
       showToast(
-        "ℹ️ Duplicate Transaction Ignored",
+        "Duplicate Transaction Ignored",
         "This payment notification was already recorded. Deduplication prevented double-counting.",
         "info"
       );
       closeModal("modal-simulate-notification");
     } else if (data.ignored) {
       showToast(
-        "🛡️ Notification Filtered Out",
+        "Notification Filtered Out",
         `${data.ignore_reason || 'Non-financial or failed notification ignored safely.'}`,
         "info"
       );
@@ -754,11 +948,18 @@ async function handleCreateExpense(e) {
     });
 
     if (res.ok) {
+      const expData = await res.json();
       showToast("Expense Saved", `${currencySymbol}${amount.toFixed(2)} logged under ${category}.`, "success");
       closeModal("modal-add-expense");
       document.getElementById("form-add-expense")?.reset();
       loadOverview();
       loadExpenses();
+      loadBudgets();
+      if (expData.budget_alert) {
+        checkAndShowBudgetAlert(expData.budget_alert);
+      } else {
+        loadBudgetAlerts();
+      }
     } else {
       showToast("Error", "Could not save expense.", "error");
     }
@@ -1027,7 +1228,7 @@ function showToast(title, message, type = "info") {
 
   toast.innerHTML = `
     <div style="font-weight: 600; font-size: 0.88rem; color: #fff;">${escapeHtml(title)}</div>
-    <div style="font-size: 0.80rem; color: var(--text-muted);">${escapeHtml(message)}</div>
+    <div style="font-size: 0.80rem; color: rgba(255, 255, 255, 0.85);">${escapeHtml(message)}</div>
   `;
 
   container.appendChild(toast);
