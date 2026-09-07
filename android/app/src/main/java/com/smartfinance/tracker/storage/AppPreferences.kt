@@ -39,9 +39,9 @@ class AppPreferences(context: Context) {
         private const val KEY_LAST_DETECTED = "last_detected_summary"
         private const val KEY_LAST_DETECTED_TIME = "last_detected_timestamp"
 
-        // 10.0.2.2 points to host machine from standard Android Emulator.
-        // Physical devices on same WiFi can configure local IP (e.g. http://192.168.1.5:8000/)
-        const val DEFAULT_URL = "http://10.0.2.2:8000/"
+        // Default backend URL points to production server deployed on Render.
+        // Can be customized in app settings dialog if running custom server.
+        const val DEFAULT_URL = "https://ai-personal-finance-tracker-7qp8.onrender.com/"
         const val DEFAULT_STUDENT_ID = 1
     }
 }
