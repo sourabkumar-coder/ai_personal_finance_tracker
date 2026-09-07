@@ -1118,9 +1118,13 @@ function onStudentSelectChanged(newId) {
 function populateStudentSelect(students) {
   const sel = document.getElementById("select-active-student");
   if (!sel) return;
-  sel.innerHTML = students
-    .map((s) => `<option value="${s.id}" ${s.id === currentStudentId ? "selected" : ""}>${escapeHtml(s.name)} (${s.email})</option>`)
-    .join("");
+  const activeStudentId = currentStudentId || (currentStudent ? currentStudent.id : 0);
+  const activeStudent = (students && activeStudentId ? students.find((s) => s.id === activeStudentId) : null) || currentStudent || (students && students.length > 0 ? students[0] : null);
+  if (!activeStudent) {
+    sel.innerHTML = "";
+    return;
+  }
+  sel.innerHTML = `<option value="${activeStudent.id}" selected>${escapeHtml(activeStudent.name)} (${activeStudent.email})</option>`;
 }
 
 async function handleRegisterStudent(e) {
