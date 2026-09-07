@@ -6,13 +6,20 @@ from app.database.database import get_db
 from app.database.models import Budget, Student
 from app.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse, BudgetStatusResponse, BudgetAlertResponse
 from app.services.budget_service import BudgetService
+from app.utils.auth import get_current_student
 
 router = APIRouter(prefix="/api/budgets", tags=["Budgets"])
 
 
 @router.post("/", response_model=BudgetResponse, status_code=status.HTTP_201_CREATED)
-def set_or_update_budget(budget_in: BudgetCreate, db: Session = Depends(get_db)):
+def set_or_update_budget(
+    budget_in: BudgetCreate,
+    db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
+):
     """Set or update a budget limit for a category."""
+    if budget_in.student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == budget_in.student_id).first()
     if not student:
         raise HTTPException(
@@ -54,8 +61,11 @@ def set_or_update_budget(budget_in: BudgetCreate, db: Session = Depends(get_db))
 def get_student_budgets(
     student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve all defined budgets for a student."""
+    if student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -71,8 +81,11 @@ def get_budget_statuses(
     year: int = Query(None, description="Filter by year (defaults to current year)"),
     month: int = Query(None, ge=1, le=12, description="Filter by month (1-12, defaults to current month)"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve spending vs limit status across categories with warning indicators."""
+    if student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -86,8 +99,11 @@ def get_budget_statuses(
 def get_budget_alerts(
     student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve active budget exceeded or near-limit warning alerts for a student."""
+    if student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -101,9 +117,12 @@ def get_budget_alerts(
 def delete_budget(
     budget_id: int = Path(..., gt=0, description="The ID of the budget to delete", examples=[1]),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Delete a budget limit."""
     budget = db.query(Budget).filter(Budget.id == budget_id).first()
+    if budget and budget.student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not budget:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

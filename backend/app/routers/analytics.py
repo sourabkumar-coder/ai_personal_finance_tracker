@@ -4,11 +4,14 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import Student
 from app.services.analytics_service import AnalyticsService
+from app.utils.auth import get_current_student
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 
-def _verify_student(student_id: int, db: Session) -> Student:
+def _verify_student(student_id: int, db: Session, current_student: Student) -> Student:
+    if student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -25,9 +28,10 @@ def get_analytics_overview(
     year: int = Query(None, description="Filter by year (defaults to current year)"),
     month: int = Query(None, ge=1, le=12, description="Filter by month (1-12, defaults to current month)"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve high-level monthly metrics: total spent, remaining allowance, savings rate."""
-    _verify_student(student_id, db)
+    _verify_student(student_id, db, current_student)
     return AnalyticsService.get_monthly_overview(db, student_id=student_id, year=year, month=month)
 
 
@@ -37,9 +41,10 @@ def get_category_breakdown(
     year: int = Query(None, description="Filter by year (defaults to current year)"),
     month: int = Query(None, ge=1, le=12, description="Filter by month (1-12, defaults to current month)"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve categorical distribution of expenditures."""
-    _verify_student(student_id, db)
+    _verify_student(student_id, db, current_student)
     return AnalyticsService.get_category_breakdown(db, student_id=student_id, year=year, month=month)
 
 
@@ -49,7 +54,8 @@ def get_spending_trends(
     year: int = Query(None, description="Filter by year (defaults to current year)"),
     month: int = Query(None, ge=1, le=12, description="Filter by month (1-12, defaults to current month)"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve daily expenditure trajectory for trend lines."""
-    _verify_student(student_id, db)
+    _verify_student(student_id, db, current_student)
     return AnalyticsService.get_spending_trends(db, student_id=student_id, year=year, month=month)

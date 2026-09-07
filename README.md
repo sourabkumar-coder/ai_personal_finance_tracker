@@ -148,7 +148,13 @@ ai_personal_finance_tracker/
 
 ## ⚡ Core Features & Capabilities
 
-### 1. 3-Tier AI Categorization Engine
+### 1. JWT-based Authentication System
+A robust authentication system ensures student data is securely isolated:
+- **Secure Registration & Login**: Users must register with an email and password. Passwords are securely hashed using bcrypt.
+- **Stateless JWT Tokens**: Issues short-lived JSON Web Tokens for API authorization.
+- **Data Isolation & Ownership**: Backend endpoints strictly verify the JWT token and enforce resource ownership checks. Students can only view, modify, or delete their own data.
+
+### 2. 3-Tier AI Categorization Engine
 Every detected transaction is categorized using a fail-safe, hierarchical intelligence pipeline:
 1. **Tier 1: Personalized Student Preference** (Confidence: `1.0`)
    - Checks if the user previously confirmed or re-categorized a merchant (e.g., if a student changes *Amazon* from *Shopping* to *Education*, future Amazon transactions inherit *Education* automatically).

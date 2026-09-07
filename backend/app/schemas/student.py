@@ -28,6 +28,10 @@ class StudentCreate(StudentBase):
     pass
 
 
+class StudentRegister(StudentBase):
+    password: str = Field(..., min_length=6, max_length=100, examples=["securepassword123"])
+
+
 class StudentUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100, examples=["Alex Johnson"])
     email: Optional[EmailStr] = Field(None, examples=["alex_new@university.edu"])
@@ -41,3 +45,14 @@ class StudentResponse(StudentBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class StudentAuthResponse(BaseModel):
+    student: StudentResponse
+    access_token: str
+    token_type: str = "bearer"

@@ -24,11 +24,14 @@ from app.ai.transaction_parser import TransactionParser, SUPPORTED_PACKAGES, SUP
 from app.ai.transaction_categorizer import TransactionCategorizer
 from app.services.deduplication_service import DeduplicationService
 from app.services.budget_service import BudgetService
+from app.utils.auth import get_current_student
 
 router = APIRouter(prefix="/api/transactions", tags=["Automatic Transactions"])
 
 
-def _get_student(student_id: int, db: Session) -> Student:
+def _get_student(student_id: int, db: Session, current_student: Student) -> Student:
+    if student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -54,12 +57,16 @@ def _get_or_create_settings(student_id: int, db: Session) -> StudentSettings:
 
 
 @router.post("/auto-detect", response_model=AutoDetectResponse, status_code=status.HTTP_200_OK)
-def auto_detect_transaction(payload: AutoDetectRequest, db: Session = Depends(get_db)):
+def auto_detect_transaction(
+    payload: AutoDetectRequest,
+    db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
+):
     """
     Ingest and process an automatically detected financial transaction from Android Companion
     or raw notification payload. Applies parsing, deduplication, and AI categorization.
     """
-    student = _get_student(payload.student_id, db)
+    student = _get_student(payload.student_id, db, current_student)
     settings = _get_or_create_settings(student.id, db)
 
     # Verify if user has enabled auto-tracking
@@ -224,11 +231,17 @@ def auto_detect_transaction(payload: AutoDetectRequest, db: Session = Depends(ge
 
 
 @router.post("/simulate-notification", response_model=AutoDetectResponse)
-def simulate_notification(req: SimulateNotificationRequest, db: Session = Depends(get_db)):
+def simulate_notification(
+    req: SimulateNotificationRequest,
+    db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
+):
     """
     Convenience demo endpoint to simulate an incoming payment notification string
     (e.g., 'Payment of ₹350 to Zomato successful') and see instant detection.
     """
+    if req.student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     detect_req = AutoDetectRequest(
         student_id=req.student_id,
         raw_notification=req.notification_text,
@@ -236,16 +249,17 @@ def simulate_notification(req: SimulateNotificationRequest, db: Session = Depend
         source_app=req.source_app,
         package_name=req.package_name,
     )
-    return auto_detect_transaction(detect_req, db)
+    return auto_detect_transaction(detect_req, db, current_student)
 
 
 @router.get("/{student_id}/status", response_model=TrackingStatusResponse)
 def get_tracking_status(
     student_id: int = Path(..., gt=0, description="The ID of the student"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Get the current automatic tracking status, recent detections, and supported apps."""
-    student = _get_student(student_id, db)
+    student = _get_student(student_id, db, current_student)
     settings = _get_or_create_settings(student.id, db)
 
     auto_expenses = (
@@ -279,12 +293,15 @@ def confirm_or_correct_category(
     req: ConfirmCategoryRequest,
     expense_id: int = Path(..., gt=0, description="The ID of the expense to confirm"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """
     Confirm or correct an expense's category.
     Optionally stores this correction in CategoryPreference for future personalized learning.
     """
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    if expense and expense.student_id != current_student.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not expense:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -330,9 +347,10 @@ def confirm_or_correct_category(
 def get_student_settings(
     student_id: int = Path(..., gt=0, description="The ID of the student"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve auto-tracking settings for a student."""
-    _get_student(student_id, db)
+    _get_student(student_id, db, current_student)
     return _get_or_create_settings(student_id, db)
 
 
@@ -341,9 +359,10 @@ def update_student_settings(
     updates: StudentSettingsUpdate,
     student_id: int = Path(..., gt=0, description="The ID of the student"),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Update auto-tracking settings for a student."""
-    _get_student(student_id, db)
+    _get_student(student_id, db, current_student)
     settings = _get_or_create_settings(student_id, db)
 
     update_dict = updates.model_dump(exclude_unset=True)

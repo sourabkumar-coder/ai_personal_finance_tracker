@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.database.database import get_db
 from app.database.models import Student, Recommendation
 from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse
+from app.utils.auth import get_current_student
 
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding"])
 
@@ -63,35 +64,18 @@ def register_student(student_in: StudentCreate, db: Session = Depends(get_db)):
     return student
 
 
-@router.get("/students", response_model=List[StudentResponse])
-def list_students(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(50, ge=1, le=100, description="Max number of records to return"),
-    db: Session = Depends(get_db),
-):
-    """List registered student profiles with pagination."""
-    return db.query(Student).order_by(Student.id.asc()).offset(skip).limit(limit).all()
 
-
-@router.get("/profile/by-email/{email}", response_model=StudentResponse)
-def get_student_by_email(email: str, db: Session = Depends(get_db)):
-    """Retrieve student profile by email address (case-insensitive)."""
-    clean_email = email.strip().lower()
-    student = db.query(Student).filter(func.lower(Student.email) == clean_email).first()
-    if not student:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Student with email '{email}' not found.",
-        )
-    return student
 
 
 @router.get("/profile/{student_id}", response_model=StudentResponse)
 def get_student_profile(
     student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Retrieve student profile by ID."""
+    if current_student.id != student_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -107,8 +91,11 @@ def update_student_profile(
     updates: StudentUpdate,
     student_id: int = Path(..., gt=0, description="The ID of the student to update", examples=[1]),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Update student profile details, email, or monthly allowance (supports PUT and PATCH)."""
+    if current_student.id != student_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(
@@ -159,8 +146,11 @@ def update_student_profile(
 def delete_student_profile(
     student_id: int = Path(..., gt=0, description="The ID of the student to delete", examples=[1]),
     db: Session = Depends(get_db),
+    current_student: Student = Depends(get_current_student),
 ):
     """Delete a student profile and all associated data (cascaded)."""
+    if current_student.id != student_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(

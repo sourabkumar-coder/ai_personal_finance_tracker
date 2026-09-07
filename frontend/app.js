@@ -7,6 +7,31 @@
 // Configuration
 const API_BASE = "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
+
+// Auth variables
+let authToken = localStorage.getItem('authToken') || null;
+
+async function apiFetch(endpoint, options = {}) {
+  const headers = { ...options.headers };
+  if (authToken) {
+    headers['Authorization'] = Bearer ;
+  }
+  const config = { ...options, headers };
+  
+  // if endpoint is absolute url, don't prepend API_BASE
+  const url = endpoint.startsWith('http') ? endpoint : ${API_BASE};
+  
+  const res = await fetch(url, config);
+  if (res.status === 401) {
+    // Show login modal
+    authToken = null;
+    localStorage.removeItem('authToken');
+    openStudentModal(); // Assuming we reuse the student modal for Auth
+    showToast('Session Expired', 'Please login again.', 'error');
+  }
+  return res;
+}
+
 // Global State
 let currentStudentId = parseInt(localStorage.getItem("activeStudentId")) || 0;
 let currentStudent = null;
@@ -14,6 +39,26 @@ let currentCurrency = "INR";
 let currencySymbol = "₹";
 let previousExpenseCount = 0;
 let pollingInterval = null;
+let authToken = localStorage.getItem("authToken") || null;
+
+async function apiFetch(endpoint, options = {}) {
+  const headers = { ...options.headers };
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+  const config = { ...options, headers };
+  
+  const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
+  
+  const res = await fetch(url, config);
+  if (res.status === 401) {
+    authToken = null;
+    localStorage.removeItem("authToken");
+    openStudentModal();
+    showToast("Session Expired", "Please login again.", "error");
+  }
+  return res;
+}
 
 // Initialize when DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
@@ -25,43 +70,28 @@ document.addEventListener("DOMContentLoaded", () => {
  * Initialize application state, students, and dashboard data.
  */
 async function initApp() {
+  if (!authToken) {
+    openStudentModal();
+    return;
+  }
   try {
-    const studentsRes = await fetch(`${API_BASE}/api/onboarding/students`);
-    if (studentsRes.ok) {
-      const students = await studentsRes.json();
-      if (students && students.length > 0) {
-        populateStudentSelect(students);
-        
-        // If currentStudentId is 0 or invalid, use the first available student
-        if (!currentStudentId || !students.find((s) => s.id === currentStudentId)) {
-          currentStudent = students[0];
-          currentStudentId = currentStudent.id;
-          localStorage.setItem("activeStudentId", currentStudentId);
-        } else {
-          currentStudent = students.find((s) => s.id === currentStudentId);
-        }
-      } else {
-        // Create initial default student if db is empty
-        await createDefaultStudent();
-        return; // createDefaultStudent will call initApp again
-      }
+    const meRes = await apiFetch("/api/auth/me");
+    if (meRes.ok) {
+      currentStudent = await meRes.json();
+      currentStudentId = currentStudent.id;
+      localStorage.setItem("activeStudentId", currentStudentId);
+      currentCurrency = currentStudent.currency || "INR";
+      currencySymbol = currentCurrency === "INR" ? "₹" : "$";
+      updateSidebarProfile();
+      loadAllViews();
+    } else {
+      authToken = null;
+      localStorage.removeItem("authToken");
+      openStudentModal();
     }
   } catch (err) {
-    console.warn("Backend not reached on direct fetch, using default student:", err);
-    // If backend is unreachable and we have no valid student ID, show error
-    if (!currentStudentId) {
-      showToast("Connection Error", "Could not connect to backend to load student data.", "error");
-      return;
-    }
-  }
-
-  // Only load views if we have a valid student ID
-  if (currentStudentId && currentStudentId > 0) {
-    updateSidebarProfile();
-    loadAllViews();
-  } else {
-    showToast("No Student Found", "Please register a student profile to continue.", "error");
-    openStudentModal();
+    console.warn("Backend not reached:", err);
+    showToast("Connection Error", "Could not connect to backend to load student data.", "error");
   }
 }
 
@@ -548,7 +578,7 @@ async function loadExpenses() {
   if (catFilter) url += `?category=${encodeURIComponent(catFilter)}`;
 
   try {
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) return;
     const expenses = await res.json();
 
@@ -1151,26 +1181,28 @@ async function handleRegisterStudent(e) {
   e.preventDefault();
   const name = document.getElementById("stud-name").value.trim();
   const email = document.getElementById("stud-email").value.trim();
+  const password = document.getElementById("stud-password").value;
   const monthly_allowance = parseFloat(document.getElementById("stud-allowance").value);
   const college_year = document.getElementById("stud-year").value;
 
   try {
-    const res = await fetch(`${API_BASE}/api/onboarding/register`, {
+    const res = await apiFetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
         email,
+        password,
         monthly_allowance,
         currency: "INR",
-        college_year,
+        college_year: college_year,
       }),
     });
 
     if (res.ok) {
-      const newStudent = await res.json();
-      currentStudentId = newStudent.id;
-      localStorage.setItem("activeStudentId", currentStudentId);
+      const data = await res.json();
+      authToken = data.access_token;
+      localStorage.setItem("authToken", authToken);
       showToast("Welcome Aboard!", `Profile created for ${name}.`, "success");
       closeModal("modal-student");
       initApp();
@@ -1179,8 +1211,50 @@ async function handleRegisterStudent(e) {
       showToast("Registration Error", err.detail || "Could not register student.", "error");
     }
   } catch (err) {
-    showToast("Network Error", "Could not register student.", "error");
+    showToast("Error", "Could not connect to server.", "error");
   }
+}
+
+async function handleLoginStudent(e) {
+  e.preventDefault();
+  const email = document.getElementById("login-email").value;
+  const password = document.getElementById("login-password").value;
+
+  try {
+    const params = new URLSearchParams();
+    params.append('username', email);
+    params.append('password', password);
+
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      authToken = data.access_token;
+      localStorage.setItem("authToken", authToken);
+      showToast("Login Successful", "Welcome back!", "success");
+      closeModal("modal-student");
+      initApp();
+    } else {
+      const err = await res.json();
+      showToast("Login Failed", err.detail || "Invalid credentials", "error");
+    }
+  } catch (err) {
+    showToast("Error", "Could not connect to server.", "error");
+  }
+}
+
+function logoutStudent() {
+  authToken = null;
+  currentStudentId = 0;
+  currentStudent = null;
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("activeStudentId");
+  document.querySelectorAll(".tab-view").forEach((tab) => tab.classList.remove("active"));
+  openStudentModal();
 }
 
 async function createDefaultStudent() {

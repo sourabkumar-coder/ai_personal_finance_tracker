@@ -67,7 +67,7 @@
             <p id="sidebar-user-year">Sophomore • ₹12,000/mo</p>
           </div>
         </div>
-        <button id="btn-switch-user" class="switch-user-btn" onclick="openStudentModal()">Switch</button>
+        <button id="btn-switch-user" class="switch-user-btn" onclick="logoutStudent()">Logout</button>
       </div>
     </aside>
 
@@ -714,15 +714,24 @@
   <div class="modal-backdrop" id="modal-student">
     <div class="modal-window">
       <div class="modal-header">
-        <h3>Select or Create Student</h3>
+        <h3>Authentication</h3>
         <button class="modal-close-btn" onclick="closeModal('modal-student')">&times;</button>
       </div>
       <div style="margin-bottom: 1.5rem;">
-        <label style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.4rem; display: block;">Switch
-          Active Student:</label>
-        <select id="select-active-student" class="form-control" onchange="onStudentSelectChanged(this.value)">
-          <!-- Populated dynamically -->
-        </select>
+        <h4 style="font-size: 0.95rem; margin-bottom: 0.85rem;">Login</h4>
+        <form id="form-login-student" onsubmit="handleLoginStudent(event)">
+          <div class="form-group">
+            <label for="login-email">Email</label>
+            <input type="email" id="login-email" class="form-control" placeholder="jordan@college.edu" required>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">Login</button>
+          </div>
+        </form>
       </div>
 
       <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 1.25rem 0;">
@@ -736,6 +745,10 @@
         <div class="form-group">
           <label for="stud-email">College Email</label>
           <input type="email" id="stud-email" class="form-control" placeholder="jordan@college.edu" required>
+        </div>
+        <div class="form-group">
+          <label for="stud-password">Password</label>
+          <input type="password" id="stud-password" class="form-control" placeholder="••••••••" required>
         </div>
         <div class="form-row">
           <div class="form-group">

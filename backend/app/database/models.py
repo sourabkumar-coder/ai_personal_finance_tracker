@@ -25,6 +25,8 @@ class Student(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     email = Column(String(150), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     monthly_allowance = Column(Float, default=0.0, nullable=False)
     currency = Column(String(10), default="INR", nullable=False)
     college_year = Column(String(50), nullable=True)

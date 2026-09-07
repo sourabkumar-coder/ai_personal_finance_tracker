@@ -70,7 +70,16 @@ def run_migrations(engine: Engine):
             conn.execute(text("UPDATE expenses SET confidence = 1.0 WHERE confidence IS NULL;"))
             conn.execute(text("UPDATE expenses SET is_automatically_detected = 0 WHERE is_automatically_detected IS NULL;"))
 
-    if added_columns:
+    # 4. Migrate students table
+    if "students" in existing_tables:
+        existing_student_cols = {col["name"] for col in inspector.get_columns("students")}
+        with engine.begin() as conn:
+            if "hashed_password" not in existing_student_cols:
+                logger.info("Adding hashed_password to students")
+                conn.execute(text("ALTER TABLE students ADD COLUMN hashed_password VARCHAR(255) NOT NULL DEFAULT 'dummy_hash_change_me'"))
+            if "is_active" not in existing_student_cols:
+                logger.info("Adding is_active to students")
+                conn.execute(text("ALTER TABLE students ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
         logger.info(f"Schema migration completed successfully. Added columns: {added_columns}")
     else:
         logger.info("Schema migration check completed: All columns already exist.")

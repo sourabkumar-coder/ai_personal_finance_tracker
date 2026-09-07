@@ -12,6 +12,7 @@ load_dotenv(os.path.join(os.path.dirname(backend_dir), ".env"))
 from app.database.database import Base, engine
 from app.database.migration import run_migrations
 from app.routers import (
+    auth_router,
     onboarding_router,
     expenses_router,
     budgets_router,
@@ -41,6 +42,7 @@ app.add_middleware(
 )
 
 # Register routers
+app.include_router(auth_router)
 app.include_router(onboarding_router)
 app.include_router(expenses_router)
 app.include_router(budgets_router)
