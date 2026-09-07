@@ -921,16 +921,34 @@ async function handleSimulateNotification(e) {
 async function handleCreateExpense(e) {
   e.preventDefault();
   if (!currentStudentId || currentStudentId <= 0) {
-    showToast("No Student Selected", "Please select a valid student profile first.", "error");
+    showToast("No Student Selected", "Please select or register a student profile first.", "error");
+    openStudentModal();
     return;
   }
 
-  const title = document.getElementById("exp-title").value.trim();
-  const amount = parseFloat(document.getElementById("exp-amount").value);
-  const category = document.getElementById("exp-category").value;
-  const dateVal = document.getElementById("exp-date").value || new Date().toISOString().split("T")[0];
-  const payment = document.getElementById("exp-payment").value;
-  const notes = document.getElementById("exp-notes").value.trim();
+  const titleEl = document.getElementById("exp-title");
+  const amountEl = document.getElementById("exp-amount");
+  const catEl = document.getElementById("exp-category");
+  const dateEl = document.getElementById("exp-date");
+  const paymentEl = document.getElementById("exp-payment");
+  const notesEl = document.getElementById("exp-notes");
+
+  const title = titleEl ? titleEl.value.trim() : "";
+  const amount = amountEl ? parseFloat(amountEl.value) : 0;
+  const category = catEl ? catEl.value : "Others";
+  const dateVal = dateEl && dateEl.value ? dateEl.value : new Date().toISOString().split("T")[0];
+  const payment = paymentEl ? paymentEl.value : "UPI";
+  const notes = notesEl ? notesEl.value.trim() : "";
+
+  if (!title) {
+    showToast("Validation Error", "Please enter an expense title/description.", "error");
+    return;
+  }
+
+  if (isNaN(amount) || amount <= 0) {
+    showToast("Validation Error", "Please enter a valid expense amount greater than 0.", "error");
+    return;
+  }
 
   try {
     const res = await fetch(`${API_BASE}/api/expenses/`, {
@@ -961,7 +979,9 @@ async function handleCreateExpense(e) {
         loadBudgetAlerts();
       }
     } else {
-      showToast("Error", "Could not save expense.", "error");
+      const errData = await res.json().catch(() => ({}));
+      const detail = typeof errData.detail === "string" ? errData.detail : "Could not save expense. Please check input values.";
+      showToast("Error Saving Expense", detail, "error");
     }
   } catch (err) {
     showToast("Network Error", "Could not connect to server.", "error");

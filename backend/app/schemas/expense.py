@@ -1,13 +1,13 @@
 from datetime import datetime, date as dt_date
-from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, Any
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class ExpenseBase(BaseModel):
     student_id: int
     title: str = Field(..., min_length=1, max_length=200, examples=["Textbook purchase"])
     amount: float = Field(..., gt=0.0, examples=[45.50])
-    category: str = Field(..., examples=["Books"])  # Food, Books, Rent, Entertainment, Travel, Utilities, Others
+    category: str = Field("Others", examples=["Books"])  # Food, Books, Rent, Entertainment, Travel, Utilities, Others
     date: dt_date = Field(default_factory=dt_date.today)
     payment_method: str = Field("UPI", examples=["UPI"])  # UPI, Card, Cash, Online
     notes: Optional[str] = Field(None, examples=["Calculus textbook second hand"])
@@ -22,6 +22,25 @@ class ExpenseBase(BaseModel):
     confidence: float = Field(1.0, ge=0.0, le=1.0)
     is_automatically_detected: bool = False
     fingerprint: Optional[str] = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def parse_date(cls, v: Any) -> dt_date:
+        if not v or v == "" or str(v).strip() == "":
+            return dt_date.today()
+        if isinstance(v, str):
+            try:
+                return dt_date.fromisoformat(v.strip())
+            except ValueError:
+                return dt_date.today()
+        return v
+
+    @field_validator("title", "category", "payment_method", mode="before")
+    @classmethod
+    def sanitize_strings(cls, v: Any) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return str(v) if v is not None else ""
 
 
 class ExpenseCreate(ExpenseBase):
