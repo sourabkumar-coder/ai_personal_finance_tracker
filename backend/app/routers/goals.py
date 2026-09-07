@@ -62,6 +62,7 @@ def get_student_goals(
     return [_to_goal_response(g) for g in goals]
 
 
+@router.post("/{goal_id}/deposit", response_model=GoalResponse)
 @router.patch("/{goal_id}/deposit", response_model=GoalResponse)
 def deposit_to_goal(
     deposit: GoalDeposit,
