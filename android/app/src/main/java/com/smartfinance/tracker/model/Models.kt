@@ -79,7 +79,7 @@ data class SimulateNotificationRequest(
     @SerializedName("student_id")
     val studentId: Int,
 
-    @SerializedName("text")
+    @SerializedName("notification_text")
     val text: String,
 
     @SerializedName("source_app")
