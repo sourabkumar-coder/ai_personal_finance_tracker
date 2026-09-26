@@ -10,30 +10,6 @@ const API_BASE = (window.location.hostname === "localhost" || window.location.ho
   : "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
 
-// Auth variables
-let authToken = localStorage.getItem('authToken') || null;
-
-async function apiFetch(endpoint, options = {}) {
-  const headers = { ...options.headers };
-  if (authToken) {
-    headers['Authorization'] = Bearer ;
-  }
-  const config = { ...options, headers };
-  
-  // if endpoint is absolute url, don't prepend API_BASE
-  const url = endpoint.startsWith('http') ? endpoint : ${API_BASE};
-  
-  const res = await fetch(url, config);
-  if (res.status === 401) {
-    // Show login modal
-    authToken = null;
-    localStorage.removeItem('authToken');
-    openStudentModal(); // Assuming we reuse the student modal for Auth
-    showToast('Session Expired', 'Please login again.', 'error');
-  }
-  return res;
-}
-
 // Global State
 let currentStudentId = parseInt(localStorage.getItem("activeStudentId")) || 0;
 let currentStudent = null;
