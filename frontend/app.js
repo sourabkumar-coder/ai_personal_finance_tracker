@@ -5,7 +5,9 @@
  */
 
 // Configuration
-const API_BASE = "https://ai-personal-finance-tracker-7qp8.onrender.com";
+const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ? "http://localhost:8000"
+  : "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
 
 // Auth variables
@@ -130,6 +132,7 @@ async function checkNewTransactions() {
         loadTrackingStatus();
         loadBudgetAlerts();
         loadRecommendations();
+        if (typeof loadTrends === "function") loadTrends();
         if (document.getElementById("tab-expenses").classList.contains("active")) {
           loadExpenses();
         }
@@ -156,6 +159,7 @@ function loadAllViews() {
   loadGoals();
   loadRecommendations();
   loadTrackingSettings();
+  if (typeof loadTrends === "function") loadTrends();
 }
 
 /**
@@ -250,6 +254,7 @@ function switchTab(tabId) {
 
   const headingMap = {
     overview: "Financial Overview",
+    trends: "Expense Trends",
     "ai-advisor": "Gemini AI Financial Advisor",
     expenses: "Itemized Expenses",
     budgets: "Monthly Budgets",
@@ -261,6 +266,7 @@ function switchTab(tabId) {
 
   // Reload tab-specific data
   if (tabId === "overview") loadOverview();
+  if (tabId === "trends" && typeof loadTrends === "function") loadTrends();
   if (tabId === "expenses") loadExpenses();
   if (tabId === "budgets") loadBudgets();
   if (tabId === "goals") loadGoals();
@@ -633,6 +639,7 @@ async function handleDeleteExpense(expenseId) {
       loadExpenses();
       loadOverview();
       loadBudgets();
+      if (typeof loadTrends === "function") loadTrends();
     }
   } catch (err) {
     showToast("Error", "Could not delete expense.", "error");
@@ -916,6 +923,7 @@ async function handleSimulateNotification(e) {
       loadExpenses();
       loadTrackingStatus();
       loadBudgets();
+      if (typeof loadTrends === "function") loadTrends();
       if (data.budget_alert) {
         checkAndShowBudgetAlert(data.budget_alert);
       } else {
@@ -1003,6 +1011,7 @@ async function handleCreateExpense(e) {
       loadOverview();
       loadExpenses();
       loadBudgets();
+      if (typeof loadTrends === "function") loadTrends();
       if (expData.budget_alert) {
         checkAndShowBudgetAlert(expData.budget_alert);
       } else {

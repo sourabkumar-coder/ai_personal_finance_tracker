@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -29,6 +30,11 @@
         <li class="nav-item">
           <button id="nav-btn-overview" class="active" onclick="switchTab('overview')">
             <span>Overview</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="nav-btn-trends" onclick="switchTab('trends')">
+            <span>Trends</span>
           </button>
         </li>
         <li class="nav-item">
@@ -214,6 +220,64 @@
                 </table>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- ================= TRENDS TAB ================= -->
+        <section id="tab-trends" class="tab-view">
+          <div class="glass-card">
+            <div class="card-header-row">
+              <h3>Expense Trend (Time vs Spend)</h3>
+              <div class="trend-toggle" role="tablist" aria-label="Trend granularity">
+                <button type="button" class="trend-toggle-btn active" data-granularity="daily"
+                  onclick="switchTrendRange('daily')">Daily</button>
+                <button type="button" class="trend-toggle-btn" data-granularity="weekly"
+                  onclick="switchTrendRange('weekly')">Weekly</button>
+                <button type="button" class="trend-toggle-btn" data-granularity="monthly"
+                  onclick="switchTrendRange('monthly')">Monthly</button>
+              </div>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem;" id="trends-subtitle">
+              Daily spend for the last 30 days.
+            </p>
+            <div class="trends-stats-row">
+              <div>
+                <span class="trends-stat-label">Total in view</span>
+                <div class="trends-stat-value" id="trends-total">-</div>
+              </div>
+              <div>
+                <span class="trends-stat-label">Average / period</span>
+                <div class="trends-stat-value" id="trends-avg">-</div>
+              </div>
+              <div>
+                <span class="trends-stat-label">Peak</span>
+                <div class="trends-stat-value" id="trends-peak">-</div>
+              </div>
+            </div>
+            <div class="trends-chart-wrap">
+              <canvas id="trends-chart" height="120"></canvas>
+            </div>
+            <p id="trends-empty" style="display: none; color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 1rem;">
+              No expenses recorded in this period yet. Log an expense to see your trend.
+            </p>
+            <p id="trends-error" style="display: none; color: var(--accent-rose); font-size: 0.85rem; text-align: center; margin-top: 1rem;"></p>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header-row">
+              <h3>Spend per Category (Current Month)</h3>
+              <span class="badge-pill" id="category-count-badge">0 Categories</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem;">
+              Total amount spent per category this month — one bar per category.
+            </p>
+            <div class="trends-chart-wrap">
+              <canvas id="category-chart" height="120"></canvas>
+            </div>
+            <p id="category-empty" style="display: none; color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 1rem;">
+              No category expenses recorded this month yet.
+            </p>
+            <p id="category-error" style="display: none; color: var(--accent-rose); font-size: 0.85rem; text-align: center; margin-top: 1rem;"></p>
           </div>
         </section>
 
@@ -807,6 +871,7 @@
   <div class="toast-container" id="toast-container"></div>
 
   <script src="app.js"></script>
+  <script src="trends.js"></script>
 </body>
 
 </html>
