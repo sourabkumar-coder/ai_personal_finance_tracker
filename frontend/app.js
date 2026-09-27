@@ -48,16 +48,29 @@ document.addEventListener("DOMContentLoaded", () => {
  * Initialize application state, students, and dashboard data.
  */
 async function initApp() {
-  if (!authToken) {
+  if (!authToken && (!currentStudentId || currentStudentId <= 0)) {
     showLoginScreen();
     return;
   }
   try {
-    const meRes = await apiFetch("/api/auth/me");
-    if (meRes.ok) {
-      currentStudent = await meRes.json();
-      currentStudentId = currentStudent.id;
-      localStorage.setItem("activeStudentId", currentStudentId);
+    let loaded = false;
+    if (authToken) {
+      const meRes = await apiFetch("/api/auth/me");
+      if (meRes.ok) {
+        currentStudent = await meRes.json();
+        currentStudentId = currentStudent.id;
+        localStorage.setItem("activeStudentId", currentStudentId);
+        loaded = true;
+      }
+    }
+    if (!loaded && currentStudentId > 0) {
+      const profRes = await apiFetch(`/api/onboarding/profile/${currentStudentId}`);
+      if (profRes.ok) {
+        currentStudent = await profRes.json();
+        loaded = true;
+      }
+    }
+    if (loaded && currentStudent) {
       currentCurrency = currentStudent.currency || "INR";
       currencySymbol = currentCurrency === "INR" ? "₹" : "$";
       updateSidebarProfile();
@@ -139,16 +152,36 @@ async function handleLoginStudent(event) {
     formData.append("username", email);
     formData.append("password", password);
 
-    const res = await apiFetch(`${API_BASE}/api/auth/login`, {
+    let res = await apiFetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formData,
     });
 
+    if (res.status === 404) {
+      res = await apiFetch(`${API_BASE}/api/onboarding/profile/by-email/${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const student = await res.json();
+        currentStudentId = student.id;
+        currentStudent = student;
+        localStorage.setItem("activeStudentId", currentStudentId);
+        showAuthAlert("Login successful! Redirecting...", "success");
+        showToast("Welcome Back!", `Logged in as ${student.name}`, "success");
+        setTimeout(async () => {
+          await initApp();
+        }, 400);
+        return;
+      }
+    }
+
     if (res.ok) {
       const data = await res.json();
       authToken = data.access_token;
       localStorage.setItem("authToken", authToken);
+      if (data.student && data.student.id) {
+        currentStudentId = data.student.id;
+        localStorage.setItem("activeStudentId", currentStudentId);
+      }
 
       showAuthAlert("Login successful! Redirecting...", "success");
       showToast("Welcome Back!", "Logged in successfully.", "success");
@@ -164,7 +197,7 @@ async function handleLoginStudent(event) {
     }
   } catch (err) {
     console.error("Login error:", err);
-    showAuthAlert("Cannot connect to server. Ensure FastAPI backend is running on port 8000.", "error");
+    showAuthAlert("Cannot connect to server. Please check network connection.", "error");
     showToast("Connection Error", "Cannot reach backend server", "error");
   } finally {
     setButtonLoading(submitBtn, false, defaultBtnContent);
@@ -207,18 +240,50 @@ async function handleRegisterStudent(event) {
       currency: "INR"
     };
 
-    const res = await apiFetch(`${API_BASE}/api/auth/register`, {
+    let res = await apiFetch(`${API_BASE}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
+    if (res.status === 404) {
+      const onboardingPayload = {
+        name,
+        email,
+        monthly_allowance: allowance,
+        college_year: year,
+        currency: "INR"
+      };
+      res = await apiFetch(`${API_BASE}/api/onboarding/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(onboardingPayload),
+      });
+      if (res.ok) {
+        const student = await res.json();
+        currentStudentId = student.id;
+        currentStudent = student;
+        localStorage.setItem("activeStudentId", currentStudentId);
+        showAuthAlert("Account created successfully!", "success");
+        showToast("Registration Complete", `Welcome ${name}!`, "success");
+        setTimeout(async () => {
+          await initApp();
+        }, 400);
+        return;
+      }
+    }
+
     if (res.ok) {
       const data = await res.json();
-      authToken = data.access_token;
-      localStorage.setItem("authToken", authToken);
+      if (data.access_token) {
+        authToken = data.access_token;
+        localStorage.setItem("authToken", authToken);
+      }
       if (data.student && data.student.id) {
         currentStudentId = data.student.id;
+        localStorage.setItem("activeStudentId", currentStudentId);
+      } else if (data.id) {
+        currentStudentId = data.id;
         localStorage.setItem("activeStudentId", currentStudentId);
       }
 
@@ -236,7 +301,7 @@ async function handleRegisterStudent(event) {
     }
   } catch (err) {
     console.error("Registration error:", err);
-    showAuthAlert("Cannot connect to server. Ensure FastAPI backend is running on port 8000.", "error");
+    showAuthAlert("Cannot connect to server. Please check network connection.", "error");
     showToast("Connection Error", "Cannot reach backend server", "error");
   } finally {
     setButtonLoading(submitBtn, false, defaultBtnContent);
