@@ -5,9 +5,10 @@
  */
 
 // Configuration
-const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-  ? "http://localhost:8000"
-  : "https://ai-personal-finance-tracker-7qp8.onrender.com";
+const API_BASE =
+  typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:8000"
+    : "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
 // Global State
 let currentStudentId = parseInt(localStorage.getItem("activeStudentId")) || 0;
@@ -1190,6 +1191,8 @@ async function handleCreateExpense(e) {
   const dateVal = dateEl && dateEl.value ? dateEl.value : new Date().toISOString().split("T")[0];
   const payment = paymentEl ? paymentEl.value : "UPI";
   const notes = notesEl ? notesEl.value.trim() : "";
+  const typeEl = document.getElementById("exp-type");
+  const transaction_type = typeEl ? typeEl.value : "EXPENSE";
 
   if (!title) {
     showToast("Validation Error", "Please enter an expense title/description.", "error");
@@ -1213,17 +1216,25 @@ async function handleCreateExpense(e) {
         date: dateVal,
         payment_method: payment,
         notes,
+        transaction_type,
       }),
     });
 
     if (res.ok) {
       const expData = await res.json();
-      showToast("Expense Saved", `${currencySymbol}${amount.toFixed(2)} logged under ${category}.`, "success");
+      const label = transaction_type === "INCOME" ? "Income Deposit" : "Expense";
+      showToast(`${label} Saved`, `${currencySymbol}${amount.toFixed(2)} logged under ${category}.`, "success");
+
+      if (expData.auto_savings_synced) {
+        showToast("🎉 20% Auto-Savings Synced!", expData.auto_savings_synced.message, "success");
+      }
+
       closeModal("modal-add-expense");
       document.getElementById("form-add-expense")?.reset();
       loadOverview();
       loadExpenses();
       loadBudgets();
+      loadGoals();
       if (typeof loadTrends === "function") loadTrends();
       if (expData.budget_alert) {
         checkAndShowBudgetAlert(expData.budget_alert);
@@ -1386,7 +1397,7 @@ function populateStudentSelect(students) {
 
 async function createDefaultStudent() {
   try {
-    const res = await apiFetch(`${API_BASE}/api/onboarding/register`, {
+    const res = await apiFetch("/api/onboarding/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

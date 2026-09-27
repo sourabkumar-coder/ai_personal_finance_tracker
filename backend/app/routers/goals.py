@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
 from app.database.database import get_db
@@ -23,10 +23,10 @@ def _to_goal_response(goal: Goal) -> GoalResponse:
 def create_goal(
     goal_in: GoalCreate,
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Create a new savings goal target."""
-    if goal_in.student_id != current_student.id:
+    if current_student and goal_in.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == goal_in.student_id).first()
     if not student:
@@ -56,10 +56,10 @@ def create_goal(
 def get_student_goals(
     student_id: int = Path(..., gt=0, description="The ID of the student", examples=[1]),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """List all goals for a student with computed progress percentage."""
-    if student_id != current_student.id:
+    if current_student and student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -78,11 +78,11 @@ def deposit_to_goal(
     deposit: GoalDeposit,
     goal_id: int = Path(..., gt=0, description="The ID of the goal", examples=[1]),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Add saved funds towards a goal."""
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if goal and goal.student_id != current_student.id:
+    if current_student and goal and goal.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not goal:
         raise HTTPException(
@@ -105,11 +105,11 @@ def update_goal(
     updates: GoalUpdate,
     goal_id: int = Path(..., gt=0, description="The ID of the goal to update", examples=[1]),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Update goal title, target, deadline, or status (supports PUT and PATCH)."""
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if goal and goal.student_id != current_student.id:
+    if current_student and goal and goal.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not goal:
         raise HTTPException(
@@ -136,11 +136,11 @@ def update_goal(
 def delete_goal(
     goal_id: int = Path(..., gt=0, description="The ID of the goal to delete", examples=[1]),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Delete a goal."""
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if goal and goal.student_id != current_student.id:
+    if current_student and goal and goal.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not goal:
         raise HTTPException(

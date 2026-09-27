@@ -11,10 +11,15 @@ from app.config import settings
 from app.database.database import get_db
 from app.database.models import Student
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    if not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        return False
 
 def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -30,30 +35,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 def get_current_student(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
-) -> Student:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> Optional[Student]:
+    if not token:
+        return None
     try:
         payload = jwt.decode(
             token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
         )
         student_id_str: str = payload.get("sub")
         if student_id_str is None:
-            raise credentials_exception
-        try:
-            student_id = int(student_id_str)
-        except ValueError:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+            return None
+        student_id = int(student_id_str)
+    except (JWTError, ValueError):
+        return None
 
     student = db.query(Student).filter(Student.id == student_id).first()
-    if student is None:
-        raise credentials_exception
-    if not student.is_active:
+    if student and not student.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return student

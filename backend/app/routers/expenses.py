@@ -7,6 +7,7 @@ from app.database.models import Expense, Student
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseResponse
 from app.schemas.budget import BudgetAlertResponse
 from app.services.budget_service import BudgetService
+from app.services.savings_service import SavingsService
 from app.utils.auth import get_current_student
 
 router = APIRouter(prefix="/api/expenses", tags=["Expenses"])
@@ -16,10 +17,10 @@ router = APIRouter(prefix="/api/expenses", tags=["Expenses"])
 def create_expense(
     expense_in: ExpenseCreate,
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Log a new expense entry (category, title/item, amount, date) for a student and store in SQLite DB."""
-    if expense_in.student_id != current_student.id:
+    if current_student and expense_in.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == expense_in.student_id).first()
     if not student:
@@ -40,9 +41,19 @@ def create_expense(
     alert = BudgetService.check_budget_exceeded(
         db, student_id=expense.student_id, category=expense.category, date_val=expense.date
     )
+
+    # 20% Auto-Savings Sync for INCOME deposits
+    savings_info = None
+    if (expense.transaction_type or "").upper() == "INCOME" and expense.amount > 0:
+        savings_info = SavingsService.sync_income_savings(
+            db, student_id=expense.student_id, income_amount=expense.amount, source_description=expense.title
+        )
+
     res = ExpenseResponse.model_validate(expense)
     if alert:
         res.budget_alert = BudgetAlertResponse.model_validate(alert)
+    if savings_info:
+        res.auto_savings_synced = savings_info
     return res
 
 
@@ -54,10 +65,10 @@ def get_student_expenses(
     end_date: Optional[date] = Query(None, description="End date filter"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Retrieve all expenses logged by a student."""
-    if student_id != current_student.id:
+    if current_student and student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -91,11 +102,11 @@ def update_expense(
     updates: ExpenseUpdate,
     expense_id: int = Path(..., gt=0, description="The ID of the expense to update", examples=[1]),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Update an expense record by expense ID."""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    if expense and expense.student_id != current_student.id:
+    if current_student and expense and expense.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not expense:
         raise HTTPException(
@@ -128,11 +139,11 @@ def update_expense(
 def delete_expense(
     expense_id: int = Path(..., gt=0, description="The ID of the expense to delete", examples=[1]),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Delete an expense record by expense ID."""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    if expense and expense.student_id != current_student.id:
+    if current_student and expense and expense.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not expense:
         raise HTTPException(

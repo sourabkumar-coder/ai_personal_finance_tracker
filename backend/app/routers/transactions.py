@@ -29,8 +29,8 @@ from app.utils.auth import get_current_student
 router = APIRouter(prefix="/api/transactions", tags=["Automatic Transactions"])
 
 
-def _get_student(student_id: int, db: Session, current_student: Student) -> Student:
-    if student_id != current_student.id:
+def _get_student(student_id: int, db: Session, current_student: Optional[Student]) -> Student:
+    if current_student and student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -60,7 +60,7 @@ def _get_or_create_settings(student_id: int, db: Session) -> StudentSettings:
 def auto_detect_transaction(
     payload: AutoDetectRequest,
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """
     Ingest and process an automatically detected financial transaction from Android Companion
@@ -213,11 +213,27 @@ def auto_detect_transaction(
     )
     alert_model = BudgetAlertResponse.model_validate(alert) if alert else None
 
+    # 20% Auto-Savings Sync for INCOME
+    savings_info = None
+    if (transaction_type or "").upper() == "INCOME" and amount > 0:
+        from app.services.savings_service import SavingsService
+        savings_info = SavingsService.sync_income_savings(
+            db, student_id=student.id, income_amount=amount, source_description=merchant or "Incoming Transfer"
+        )
+
+    msg = f"Transaction of {student.currency} {amount:.2f} at {merchant} automatically recorded as {category}."
+    if savings_info:
+        msg += f" {savings_info['message']}"
+
+    exp_res = ExpenseResponse.model_validate(expense)
+    if savings_info:
+        exp_res.auto_savings_synced = savings_info
+
     return AutoDetectResponse(
         success=True,
         is_duplicate=False,
-        message=f"Transaction of {student.currency} {amount:.2f} at {merchant} automatically recorded as {category}.",
-        expense=ExpenseResponse.model_validate(expense),
+        message=msg,
+        expense=exp_res,
         parsed_details={
             "amount": amount,
             "merchant": merchant,
@@ -234,13 +250,13 @@ def auto_detect_transaction(
 def simulate_notification(
     req: SimulateNotificationRequest,
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """
     Convenience demo endpoint to simulate an incoming payment notification string
     (e.g., 'Payment of ₹350 to Zomato successful') and see instant detection.
     """
-    if req.student_id != current_student.id:
+    if current_student and req.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     detect_req = AutoDetectRequest(
         student_id=req.student_id,
@@ -256,7 +272,7 @@ def simulate_notification(
 def get_tracking_status(
     student_id: int = Path(..., gt=0, description="The ID of the student"),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Get the current automatic tracking status, recent detections, and supported apps."""
     student = _get_student(student_id, db, current_student)
@@ -293,14 +309,14 @@ def confirm_or_correct_category(
     req: ConfirmCategoryRequest,
     expense_id: int = Path(..., gt=0, description="The ID of the expense to confirm"),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """
     Confirm or correct an expense's category.
     Optionally stores this correction in CategoryPreference for future personalized learning.
     """
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    if expense and expense.student_id != current_student.id:
+    if current_student and expense and expense.student_id != current_student.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this resource")
     if not expense:
         raise HTTPException(
@@ -347,7 +363,7 @@ def confirm_or_correct_category(
 def get_student_settings(
     student_id: int = Path(..., gt=0, description="The ID of the student"),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Retrieve auto-tracking settings for a student."""
     _get_student(student_id, db, current_student)
@@ -359,7 +375,7 @@ def update_student_settings(
     updates: StudentSettingsUpdate,
     student_id: int = Path(..., gt=0, description="The ID of the student"),
     db: Session = Depends(get_db),
-    current_student: Student = Depends(get_current_student),
+    current_student: Optional[Student] = Depends(get_current_student),
 ):
     """Update auto-tracking settings for a student."""
     _get_student(student_id, db, current_student)

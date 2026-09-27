@@ -72,6 +72,7 @@ class ExpenseResponse(ExpenseBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     budget_alert: Optional[BudgetAlertResponse] = None
+    auto_savings_synced: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -765,7 +765,15 @@
               <option value="Rent">Rent</option>
               <option value="Travel">Travel</option>
               <option value="Utilities">Utilities</option>
+              <option value="Income">Income / Allowance</option>
               <option value="Others">Others</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="exp-type">Transaction Type</label>
+            <select id="exp-type" class="form-control">
+              <option value="EXPENSE">Expense (Outgoing)</option>
+              <option value="INCOME">Income Deposit (20% Auto-Savings Sync)</option>
             </select>
           </div>
         </div>
@@ -919,8 +927,8 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toast-container"></div>
 
-  <script src="app.js"></script>
-  <script src="trends.js"></script>
+  <script type="module" src="app.js"></script>
+  <script type="module" src="trends.js"></script>
 </body>
 
 </html>
