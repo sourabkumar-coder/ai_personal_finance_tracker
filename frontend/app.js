@@ -5,32 +5,9 @@
  */
 
 // Configuration
-const API_BASE = "https://ai-personal-finance-tracker-7qp8.onrender.com";
-
-
-// Auth variables
-let authToken = localStorage.getItem('authToken') || null;
-
-async function apiFetch(endpoint, options = {}) {
-  const headers = { ...options.headers };
-  if (authToken) {
-    headers['Authorization'] = Bearer;
-  }
-  const config = { ...options, headers };
-
-  // if endpoint is absolute url, don't prepend API_BASE
-  const url = endpoint.startsWith('http') ? endpoint : ${ API_BASE };
-
-  const res = await fetch(url, config);
-  if (res.status === 401) {
-    // Show login modal
-    authToken = null;
-    localStorage.removeItem('authToken');
-    openStudentModal(); // Assuming we reuse the student modal for Auth
-    showToast('Session Expired', 'Please login again.', 'error');
-  }
-  return res;
-}
+const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ? "http://localhost:8000"
+  : "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
 // Global State
 let currentStudentId = parseInt(localStorage.getItem("activeStudentId")) || 0;
@@ -50,7 +27,7 @@ async function apiFetch(endpoint, options = {}) {
 
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
 
-  const res = await apiFetch(url, config);
+  const res = await fetch(url, config);
   if (res.status === 401) {
     authToken = null;
     localStorage.removeItem("authToken");
@@ -1379,20 +1356,6 @@ async function handleDepositGoal(e) {
 /**
  * Student Profile & Switching
  */
-function updateSidebarProfile() {
-  if (!currentStudent) return;
-  const avatar = document.getElementById("sidebar-user-avatar");
-  const name = document.getElementById("sidebar-user-name");
-  const year = document.getElementById("sidebar-user-year");
-
-  if (name) name.textContent = currentStudent.name || "Student";
-  if (year) year.textContent = `${currentStudent.college_year || 'Undergrad'} • ${currencySymbol}${(currentStudent.monthly_allowance || 0).toFixed(0)}/mo`;
-  if (avatar) {
-    const initials = (currentStudent.name || "S").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-    avatar.textContent = initials;
-  }
-}
-
 function openStudentModal() {
   showLoginScreen();
 }
@@ -1419,84 +1382,6 @@ function populateStudentSelect(students) {
     return;
   }
   sel.innerHTML = `<option value="${activeStudent.id}" selected>${escapeHtml(activeStudent.name)} (${activeStudent.email})</option>`;
-}
-
-async function handleRegisterStudent(e) {
-  e.preventDefault();
-  const name = document.getElementById("stud-name").value.trim();
-  const email = document.getElementById("stud-email").value.trim();
-  const password = document.getElementById("stud-password").value;
-  const monthly_allowance = parseFloat(document.getElementById("stud-allowance").value);
-  const college_year = document.getElementById("stud-year").value;
-
-  try {
-    const res = await apiFetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        monthly_allowance,
-        currency: "INR",
-        college_year: college_year,
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      authToken = data.access_token;
-      localStorage.setItem("authToken", authToken);
-      showToast("Welcome Aboard!", `Profile created for ${name}.`, "success");
-      initApp();
-    } else {
-      const err = await res.json();
-      showToast("Registration Error", err.detail || "Could not register student.", "error");
-    }
-  } catch (err) {
-    showToast("Error", "Could not connect to server.", "error");
-  }
-}
-
-async function handleLoginStudent(e) {
-  e.preventDefault();
-  const email = document.getElementById("login-email").value;
-  const password = document.getElementById("login-password").value;
-
-  try {
-    const params = new URLSearchParams();
-    params.append('username', email);
-    params.append('password', password);
-
-    const res = await apiFetch(`${API_BASE}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString(),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      authToken = data.access_token;
-      localStorage.setItem("authToken", authToken);
-      showToast("Login Successful", "Welcome back!", "success");
-      initApp();
-    } else {
-      const err = await res.json();
-      showToast("Login Failed", err.detail || "Invalid credentials", "error");
-    }
-  } catch (err) {
-    showToast("Error", "Could not connect to server.", "error");
-  }
-}
-
-function logoutStudent() {
-  authToken = null;
-  currentStudentId = 0;
-  currentStudent = null;
-  localStorage.removeItem("authToken");
-  localStorage.removeItem("activeStudentId");
-  document.querySelectorAll(".tab-view").forEach((tab) => tab.classList.remove("active"));
-  showLoginScreen();
 }
 
 async function createDefaultStudent() {

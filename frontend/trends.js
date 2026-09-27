@@ -43,6 +43,22 @@ function getApiBase() {
 }
 
 /**
+ * Authenticated GET that reuses app.js's apiFetch() (Bearer token + 401
+ * handling) when available, falling back to a manual token header.
+ */
+function trendsFetch(url) {
+  if (typeof apiFetch === "function") return apiFetch(url);
+  let token = null;
+  try {
+    token = localStorage.getItem("authToken");
+  } catch (e) {
+    token = null;
+  }
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  return fetch(url, { headers });
+}
+
+/**
  * Range toggle handler wired from index.html pill buttons.
  */
 function switchTrendRange(granularity) {
@@ -83,7 +99,7 @@ async function loadTrends(granularity) {
   }
 
   try {
-    const res = await fetch(`${getApiBase()}/api/analytics/${studentId}/trends?granularity=${range}`);
+    const res = await trendsFetch(`${getApiBase()}/api/analytics/${studentId}/trends?granularity=${range}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buckets = await res.json();
     renderTrendsChart(buckets || [], range);
@@ -216,7 +232,7 @@ async function loadCategoryChart() {
   }
 
   try {
-    const res = await fetch(`${getApiBase()}/api/analytics/${studentId}/by-category`);
+    const res = await trendsFetch(`${getApiBase()}/api/analytics/${studentId}/by-category`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const breakdown = await res.json();
     renderCategoryChart(Array.isArray(breakdown) ? breakdown : []);
