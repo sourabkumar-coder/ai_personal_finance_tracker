@@ -3,8 +3,8 @@ from datetime import date
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database.models import Budget, Expense, Recommendation
+from app.services.sms_service import SmsService
 from app.utils.helpers import get_current_month_range
-
 
 class BudgetService:
     @staticmethod
@@ -146,7 +146,7 @@ class BudgetService:
             db.add(new_rec)
             db.commit()
 
-        return {
+        alert = {
             "is_exceeded": is_exceeded,
             "is_warning": is_warning,
             "category": budget.category,
@@ -156,6 +156,13 @@ class BudgetService:
             "percentage_used": percentage,
             "message": message,
         }
+
+        # Mobile SMS alert (TextBee) for warnings + exceeded. Guarded by
+        # once-per-month dedupe + daily cap inside SmsService; never raises.
+        SmsService.maybe_send_budget_alert(
+            db, student_id=student_id, alert=alert, year=target_year, month=target_month
+        )
+        return alert
 
     @staticmethod
     def get_budget_alerts(db: Session, student_id: int) -> List[Dict[str, Any]]:

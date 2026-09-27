@@ -9,6 +9,7 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -111,6 +112,33 @@ class Recommendation(Base):
     created_at = Column(DateTime, default=utc_now)
 
     student = relationship("Student", back_populates="recommendations")
+
+
+class SmsAlertLog(Base):
+    """
+    Dedupe record for outbound budget SMS alerts (TextBee).
+
+    One row per (student, category, month, level) guarantees at most one
+    real SMS per category per month per alert level, protecting the
+    TextBee daily quota (50 SMS/day on the free tier).
+    """
+
+    __tablename__ = "sms_alert_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False, index=True)
+    category = Column(String(100), nullable=False)
+    level = Column(String(20), nullable=False)  # warning | exceeded
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    sent_at = Column(DateTime, default=utc_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "student_id", "category", "level", "year", "month",
+            name="uq_sms_alert_per_category_month",
+        ),
+    )
 
 
 class CategoryPreference(Base):
