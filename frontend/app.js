@@ -5,10 +5,32 @@
  */
 
 // Configuration
-const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-  ? "http://localhost:8000"
-  : "https://ai-personal-finance-tracker-7qp8.onrender.com";
+const API_BASE = "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
+
+// Auth variables
+let authToken = localStorage.getItem('authToken') || null;
+
+async function apiFetch(endpoint, options = {}) {
+  const headers = { ...options.headers };
+  if (authToken) {
+    headers['Authorization'] = Bearer;
+  }
+  const config = { ...options, headers };
+
+  // if endpoint is absolute url, don't prepend API_BASE
+  const url = endpoint.startsWith('http') ? endpoint : ${ API_BASE };
+
+  const res = await fetch(url, config);
+  if (res.status === 401) {
+    // Show login modal
+    authToken = null;
+    localStorage.removeItem('authToken');
+    openStudentModal(); // Assuming we reuse the student modal for Auth
+    showToast('Session Expired', 'Please login again.', 'error');
+  }
+  return res;
+}
 
 // Global State
 let currentStudentId = parseInt(localStorage.getItem("activeStudentId")) || 0;
@@ -25,14 +47,14 @@ async function apiFetch(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${authToken}`;
   }
   const config = { ...options, headers };
-  
+
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
-  
-  const res = await fetch(url, config);
+
+  const res = await apiFetch(url, config);
   if (res.status === 401) {
     authToken = null;
     localStorage.removeItem("authToken");
-    openStudentModal();
+    showLoginScreen();
     showToast("Session Expired", "Please login again.", "error");
   }
   return res;
@@ -49,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
  */
 async function initApp() {
   if (!authToken) {
-    openStudentModal();
+    showLoginScreen();
     return;
   }
   try {
@@ -62,16 +84,254 @@ async function initApp() {
       currencySymbol = currentCurrency === "INR" ? "₹" : "$";
       updateSidebarProfile();
       loadAllViews();
+      hideLoginScreen();
     } else {
-      authToken = null;
-      localStorage.removeItem("authToken");
-      openStudentModal();
+      showLoginScreen();
     }
   } catch (err) {
-    console.warn("Backend not reached:", err);
-    showToast("Connection Error", "Could not connect to backend to load student data.", "error");
+    console.error("Init error", err);
+    showLoginScreen();
   }
 }
+
+/**
+ * Toggle Login Screen
+ */
+function showLoginScreen() {
+  const loginScreen = document.getElementById("login-screen");
+  const appDashboard = document.getElementById("app-dashboard");
+  if (loginScreen) loginScreen.style.display = "flex";
+  if (appDashboard) appDashboard.style.display = "none";
+}
+
+function hideLoginScreen() {
+  const loginScreen = document.getElementById("login-screen");
+  const appDashboard = document.getElementById("app-dashboard");
+  if (loginScreen) loginScreen.style.display = "none";
+  if (appDashboard) appDashboard.style.display = "flex";
+}
+
+/**
+ * Switch between Login and Register tabs on the Auth screen
+ */
+function switchAuthTab(tab) {
+  const loginTab = document.getElementById("auth-tab-login");
+  const registerTab = document.getElementById("auth-tab-register");
+  const loginPanel = document.getElementById("auth-panel-login");
+  const registerPanel = document.getElementById("auth-panel-register");
+  const authAlert = document.getElementById("auth-alert");
+
+  if (authAlert) authAlert.style.display = "none";
+
+  if (tab === "login") {
+    if (loginTab) loginTab.classList.add("active");
+    if (registerTab) registerTab.classList.remove("active");
+    if (loginPanel) loginPanel.style.display = "block";
+    if (registerPanel) registerPanel.style.display = "none";
+  } else {
+    if (registerTab) registerTab.classList.add("active");
+    if (loginTab) loginTab.classList.remove("active");
+    if (registerPanel) registerPanel.style.display = "block";
+    if (loginPanel) loginPanel.style.display = "none";
+  }
+}
+
+/**
+ * Handle Login Form Submit
+ */
+async function handleLoginStudent(event) {
+  if (event) event.preventDefault();
+  const emailInput = document.getElementById("login-email");
+  const passwordInput = document.getElementById("login-password");
+  const submitBtn = document.getElementById("btn-submit-login");
+
+  const email = emailInput ? emailInput.value.trim() : "";
+  const password = passwordInput ? passwordInput.value : "";
+
+  if (!email || !password) {
+    showAuthAlert("Please enter both email and password.", "error");
+    return;
+  }
+
+  const defaultBtnContent = `<span>Sign In to Account</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
+  setButtonLoading(submitBtn, true, "Logging in...");
+
+  try {
+    const formData = new URLSearchParams();
+    formData.append("username", email);
+    formData.append("password", password);
+
+    const res = await apiFetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData,
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      authToken = data.access_token;
+      localStorage.setItem("authToken", authToken);
+
+      showAuthAlert("Login successful! Redirecting...", "success");
+      showToast("Welcome Back!", "Logged in successfully.", "success");
+
+      setTimeout(async () => {
+        await initApp();
+      }, 400);
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      const msg = errData.detail || "Incorrect email or password. Please try again.";
+      showAuthAlert(msg, "error");
+      showToast("Login Failed", msg, "error");
+    }
+  } catch (err) {
+    console.error("Login error:", err);
+    showAuthAlert("Cannot connect to server. Ensure FastAPI backend is running on port 8000.", "error");
+    showToast("Connection Error", "Cannot reach backend server", "error");
+  } finally {
+    setButtonLoading(submitBtn, false, defaultBtnContent);
+  }
+}
+
+/**
+ * Handle Registration Form Submit
+ */
+async function handleRegisterStudent(event) {
+  if (event) event.preventDefault();
+  const nameInput = document.getElementById("stud-name");
+  const emailInput = document.getElementById("stud-email");
+  const passwordInput = document.getElementById("stud-password");
+  const allowanceInput = document.getElementById("stud-allowance");
+  const yearInput = document.getElementById("stud-year");
+  const submitBtn = document.getElementById("btn-submit-register");
+
+  const name = nameInput ? nameInput.value.trim() : "";
+  const email = emailInput ? emailInput.value.trim() : "";
+  const password = passwordInput ? passwordInput.value : "";
+  const allowance = allowanceInput ? parseFloat(allowanceInput.value) : 0;
+  const year = yearInput ? yearInput.value : "Freshman";
+
+  if (!name || !email || !password || !allowance) {
+    showAuthAlert("Please fill in all required fields.", "error");
+    return;
+  }
+
+  const defaultBtnContent = `<span>Create Student Account</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
+  setButtonLoading(submitBtn, true, "Creating Account...");
+
+  try {
+    const payload = {
+      name,
+      email,
+      password,
+      monthly_allowance: allowance,
+      college_year: year,
+      currency: "INR"
+    };
+
+    const res = await apiFetch(`${API_BASE}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      authToken = data.access_token;
+      localStorage.setItem("authToken", authToken);
+      if (data.student && data.student.id) {
+        currentStudentId = data.student.id;
+        localStorage.setItem("activeStudentId", currentStudentId);
+      }
+
+      showAuthAlert("Account created successfully!", "success");
+      showToast("Registration Complete", "Welcome to SmartFinance AI!", "success");
+
+      setTimeout(async () => {
+        await initApp();
+      }, 400);
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      const msg = errData.detail || "Registration failed. Email may already be registered.";
+      showAuthAlert(msg, "error");
+      showToast("Registration Failed", msg, "error");
+    }
+  } catch (err) {
+    console.error("Registration error:", err);
+    showAuthAlert("Cannot connect to server. Ensure FastAPI backend is running on port 8000.", "error");
+    showToast("Connection Error", "Cannot reach backend server", "error");
+  } finally {
+    setButtonLoading(submitBtn, false, defaultBtnContent);
+  }
+}
+
+/**
+ * Handle Student Logout
+ */
+function logoutStudent() {
+  authToken = null;
+  currentStudent = null;
+  currentStudentId = 0;
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("activeStudentId");
+  showLoginScreen();
+  showToast("Logged Out", "You have been safely logged out.", "info");
+}
+
+/**
+ * Update Sidebar User Profile Card
+ */
+function updateSidebarProfile() {
+  if (!currentStudent) return;
+  const nameEl = document.getElementById("sidebar-user-name");
+  const yearEl = document.getElementById("sidebar-user-year");
+  const avatarEl = document.getElementById("sidebar-user-avatar");
+
+  if (nameEl) nameEl.textContent = currentStudent.name || "Student User";
+  if (yearEl) {
+    const year = currentStudent.college_year || "Student";
+    const allowance = currentStudent.monthly_allowance
+      ? `${currencySymbol}${currentStudent.monthly_allowance.toLocaleString()}/mo`
+      : "";
+    yearEl.textContent = `${year} • ${allowance}`;
+  }
+  if (avatarEl) {
+    const initials = (currentStudent.name || "SU")
+      .trim()
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase();
+    avatarEl.textContent = initials || "SF";
+  }
+}
+
+function showAuthAlert(message, type = "error") {
+  const alertEl = document.getElementById("auth-alert");
+  if (!alertEl) return;
+  alertEl.textContent = message;
+  alertEl.className = `auth-alert ${type}`;
+  alertEl.style.display = "flex";
+}
+
+function setButtonLoading(btn, isLoading, defaultHtml) {
+  if (!btn) return;
+  btn.disabled = isLoading;
+  if (isLoading) {
+    btn.innerHTML = `<span class="auth-spinner"></span> ${defaultHtml}`;
+  } else {
+    btn.innerHTML = defaultHtml;
+  }
+}
+
+// Expose on window for inline HTML event attributes
+window.switchAuthTab = switchAuthTab;
+window.handleLoginStudent = handleLoginStudent;
+window.handleRegisterStudent = handleRegisterStudent;
+window.logoutStudent = logoutStudent;
+window.updateSidebarProfile = updateSidebarProfile;
+
 
 /**
  * Setup 4-second live polling for auto-detected transactions.
@@ -89,9 +349,9 @@ function setupPolling() {
  */
 async function checkNewTransactions() {
   if (!currentStudentId || currentStudentId <= 0) return;
-  
+
   try {
-    const res = await fetch(`${API_BASE}/api/expenses/${currentStudentId}`);
+    const res = await apiFetch(`${API_BASE}/api/expenses/${currentStudentId}`);
     if (!res.ok) return;
     const expenses = await res.json();
 
@@ -147,7 +407,7 @@ async function loadBudgetAlerts() {
   if (!banner) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/budgets/${currentStudentId}/alerts`);
+    const res = await apiFetch(`${API_BASE}/api/budgets/${currentStudentId}/alerts`);
     if (!res.ok) {
       banner.style.display = "none";
       return;
@@ -264,7 +524,7 @@ async function loadOverview() {
 
   try {
     // 1. Student Profile
-    const profRes = await fetch(`${API_BASE}/api/onboarding/profile/${currentStudentId}`);
+    const profRes = await apiFetch(`${API_BASE}/api/onboarding/profile/${currentStudentId}`);
     if (profRes.ok) {
       currentStudent = await profRes.json();
       currentCurrency = currentStudent.currency || "INR";
@@ -273,7 +533,7 @@ async function loadOverview() {
     }
 
     // 2. Analytics Overview
-    const analyticsRes = await fetch(`${API_BASE}/api/analytics/${currentStudentId}/overview`);
+    const analyticsRes = await apiFetch(`${API_BASE}/api/analytics/${currentStudentId}/overview`);
     if (analyticsRes.ok) {
       const a = await analyticsRes.json();
       const allowance = a.monthly_allowance || 0.0;
@@ -282,19 +542,19 @@ async function loadOverview() {
       const pct = allowance > 0 ? ((spent / allowance) * 100).toFixed(1) : 0;
 
       const elAllowance = document.getElementById("val-monthly-allowance");
-      if (elAllowance) elAllowance.textContent = `${currencySymbol}${allowance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      if (elAllowance) elAllowance.textContent = `${currencySymbol}${allowance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       const elCurrency = document.getElementById("val-monthly-currency");
       if (elCurrency) elCurrency.textContent = `${currentCurrency} / Month`;
 
       const elSpent = document.getElementById("val-total-spent");
-      if (elSpent) elSpent.textContent = `${currencySymbol}${spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      if (elSpent) elSpent.textContent = `${currencySymbol}${spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       const elSpentPct = document.getElementById("val-spent-pct");
       if (elSpentPct) elSpentPct.textContent = `${pct}% of monthly allowance`;
 
       const elRemaining = document.getElementById("val-remaining-balance");
-      if (elRemaining) elRemaining.textContent = `${currencySymbol}${remaining.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      if (elRemaining) elRemaining.textContent = `${currencySymbol}${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       const daysInMonth = 30;
       const day = new Date().getDate();
@@ -305,14 +565,14 @@ async function loadOverview() {
     }
 
     // 2b. Category Breakdown
-    const catRes = await fetch(`${API_BASE}/api/analytics/${currentStudentId}/by-category`);
+    const catRes = await apiFetch(`${API_BASE}/api/analytics/${currentStudentId}/by-category`);
     if (catRes.ok) {
       const catData = await catRes.json();
       renderCategoryList(catData);
     }
 
     // 3. Forecast
-    const fcRes = await fetch(`${API_BASE}/api/recommendations/${currentStudentId}/forecast`);
+    const fcRes = await apiFetch(`${API_BASE}/api/recommendations/${currentStudentId}/forecast`);
     if (fcRes.ok) {
       const fc = await fcRes.json();
       const statusEl = document.getElementById("val-health-status");
@@ -327,7 +587,7 @@ async function loadOverview() {
     }
 
     // 4. Recent Expenses
-    const expRes = await fetch(`${API_BASE}/api/expenses/${currentStudentId}`);
+    const expRes = await apiFetch(`${API_BASE}/api/expenses/${currentStudentId}`);
     if (expRes.ok) {
       const expenses = await expRes.json();
       previousExpenseCount = expenses.length;
@@ -399,7 +659,7 @@ async function handleUpdateAllowance(e) {
   const currency = document.getElementById("edit-allowance-currency").value;
 
   try {
-    const res = await fetch(`${API_BASE}/api/onboarding/profile/${currentStudentId}`, {
+    const res = await apiFetch(`${API_BASE}/api/onboarding/profile/${currentStudentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -465,7 +725,7 @@ async function loadTrackingStatus() {
     return;
   }
   try {
-    const res = await fetch(`${API_BASE}/api/transactions/${currentStudentId}/status`);
+    const res = await apiFetch(`${API_BASE}/api/transactions/${currentStudentId}/status`);
     if (!res.ok) return;
     const stat = await res.json();
 
@@ -503,7 +763,7 @@ async function loadTrackingSettings() {
     return;
   }
   try {
-    const res = await fetch(`${API_BASE}/api/transactions/${currentStudentId}/settings`);
+    const res = await apiFetch(`${API_BASE}/api/transactions/${currentStudentId}/settings`);
     if (!res.ok) return;
     const s = await res.json();
 
@@ -530,7 +790,7 @@ async function handleToggleSetting(key, val) {
   try {
     const payload = {};
     payload[key] = val;
-    const res = await fetch(`${API_BASE}/api/transactions/${currentStudentId}/settings`, {
+    const res = await apiFetch(`${API_BASE}/api/transactions/${currentStudentId}/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -606,10 +866,10 @@ async function handleDeleteExpense(expenseId) {
     showToast("No Student Selected", "Please select a valid student profile first.", "error");
     return;
   }
-  
+
   if (!confirm("Are you sure you want to delete this expense?")) return;
   try {
-    const res = await fetch(`${API_BASE}/api/expenses/${expenseId}`, { method: "DELETE" });
+    const res = await apiFetch(`${API_BASE}/api/expenses/${expenseId}`, { method: "DELETE" });
     if (res.ok) {
       showToast("Deleted", "Expense entry removed.", "info");
       loadExpenses();
@@ -634,7 +894,7 @@ async function loadBudgets() {
   if (!container) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/budgets/${currentStudentId}/status`);
+    const res = await apiFetch(`${API_BASE}/api/budgets/${currentStudentId}/status`);
     if (!res.ok) return;
     const budgets = await res.json();
 
@@ -649,17 +909,17 @@ async function loadBudgets() {
         const limit = b.monthly_limit || 1.0;
         const remaining = b.remaining !== undefined ? b.remaining : Math.max(0, limit - spent);
         const pct = Math.min(100, Math.round(b.percentage_used || 0));
-        const color = b.status === "Exceeded" || pct >= 100 
-          ? "var(--accent-rose)" 
-          : b.status === "Warning" || pct >= 80 
-          ? "var(--accent-amber)" 
-          : "var(--accent-emerald)";
+        const color = b.status === "Exceeded" || pct >= 100
+          ? "var(--accent-rose)"
+          : b.status === "Warning" || pct >= 80
+            ? "var(--accent-amber)"
+            : "var(--accent-emerald)";
 
-        const statusLabel = b.status === "Exceeded" 
-          ? `Exceeded (${pct}%)` 
-          : b.status === "Warning" 
-          ? `Near Limit (${pct}%)` 
-          : `${pct}% Used`;
+        const statusLabel = b.status === "Exceeded"
+          ? `Exceeded (${pct}%)`
+          : b.status === "Warning"
+            ? `Near Limit (${pct}%)`
+            : `${pct}% Used`;
 
         const isExceeded = b.status === "Exceeded" || pct >= 100;
         const cardClass = isExceeded ? "glass-card budget-card-exceeded" : "glass-card";
@@ -698,7 +958,7 @@ async function loadBudgets() {
 async function handleDeleteBudget(budgetId) {
   if (!confirm("Are you sure you want to delete this budget limit?")) return;
   try {
-    const res = await fetch(`${API_BASE}/api/budgets/${budgetId}`, { method: "DELETE" });
+    const res = await apiFetch(`${API_BASE}/api/budgets/${budgetId}`, { method: "DELETE" });
     if (res.ok) {
       showToast("Budget Removed", "Category budget limit deleted.", "info");
       loadBudgets();
@@ -720,7 +980,7 @@ async function loadGoals() {
   if (!container) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/goals/${currentStudentId}`);
+    const res = await apiFetch(`${API_BASE}/api/goals/${currentStudentId}`);
     if (!res.ok) return;
     const goals = await res.json();
 
@@ -773,7 +1033,7 @@ async function loadRecommendations() {
   if (!container) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/recommendations/${currentStudentId}`);
+    const res = await apiFetch(`${API_BASE}/api/recommendations/${currentStudentId}`);
     if (!res.ok) return;
     const recs = await res.json();
 
@@ -818,7 +1078,7 @@ async function triggerGenerateRecommendations() {
   if (btnIcon) btnIcon.textContent = "";
 
   try {
-    const res = await fetch(`${API_BASE}/api/recommendations/${currentStudentId}/generate`, { method: "POST" });
+    const res = await apiFetch(`${API_BASE}/api/recommendations/${currentStudentId}/generate`, { method: "POST" });
     if (res.ok) {
       showToast("AI Recommendations Updated", "Fresh financial advice generated from your recent habits.", "success");
       loadRecommendations();
@@ -838,7 +1098,7 @@ async function triggerGenerateRecommendations() {
  */
 async function handleDismissRec(recId) {
   try {
-    const res = await fetch(`${API_BASE}/api/recommendations/${recId}`, { method: "DELETE" });
+    const res = await apiFetch(`${API_BASE}/api/recommendations/${recId}`, { method: "DELETE" });
     if (res.ok) {
       loadRecommendations();
     }
@@ -875,7 +1135,7 @@ async function handleSimulateNotification(e) {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-    const res = await fetch(`${API_BASE}/api/transactions/simulate-notification`, {
+    const res = await apiFetch(`${API_BASE}/api/transactions/simulate-notification`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -936,7 +1196,7 @@ async function handleCreateExpense(e) {
   e.preventDefault();
   if (!currentStudentId || currentStudentId <= 0) {
     showToast("No Student Selected", "Please select or register a student profile first.", "error");
-    openStudentModal();
+    openModal("modal-student");
     return;
   }
 
@@ -965,7 +1225,7 @@ async function handleCreateExpense(e) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/expenses/`, {
+    const res = await apiFetch(`${API_BASE}/api/expenses/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1018,7 +1278,7 @@ async function handleCreateBudget(e) {
   const now = new Date();
 
   try {
-    const res = await fetch(`${API_BASE}/api/budgets/`, {
+    const res = await apiFetch(`${API_BASE}/api/budgets/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1058,7 +1318,7 @@ async function handleCreateGoal(e) {
   const deadline = document.getElementById("goal-deadline").value;
 
   try {
-    const res = await fetch(`${API_BASE}/api/goals/`, {
+    const res = await apiFetch(`${API_BASE}/api/goals/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1099,7 +1359,7 @@ async function handleDepositGoal(e) {
   const amount = parseFloat(document.getElementById("deposit-amount").value);
 
   try {
-    const res = await fetch(`${API_BASE}/api/goals/${goalId}/deposit`, {
+    const res = await apiFetch(`${API_BASE}/api/goals/${goalId}/deposit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount }),
@@ -1134,7 +1394,7 @@ function updateSidebarProfile() {
 }
 
 function openStudentModal() {
-  openModal("modal-student");
+  showLoginScreen();
 }
 
 function onStudentSelectChanged(newId) {
@@ -1143,10 +1403,9 @@ function onStudentSelectChanged(newId) {
     showToast("Invalid Selection", "Please select a valid student.", "error");
     return;
   }
-  
+
   currentStudentId = parsedId;
   localStorage.setItem("activeStudentId", currentStudentId);
-  closeModal("modal-student");
   initApp();
 }
 
@@ -1189,7 +1448,6 @@ async function handleRegisterStudent(e) {
       authToken = data.access_token;
       localStorage.setItem("authToken", authToken);
       showToast("Welcome Aboard!", `Profile created for ${name}.`, "success");
-      closeModal("modal-student");
       initApp();
     } else {
       const err = await res.json();
@@ -1210,7 +1468,7 @@ async function handleLoginStudent(e) {
     params.append('username', email);
     params.append('password', password);
 
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await apiFetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
@@ -1221,7 +1479,6 @@ async function handleLoginStudent(e) {
       authToken = data.access_token;
       localStorage.setItem("authToken", authToken);
       showToast("Login Successful", "Welcome back!", "success");
-      closeModal("modal-student");
       initApp();
     } else {
       const err = await res.json();
@@ -1239,12 +1496,12 @@ function logoutStudent() {
   localStorage.removeItem("authToken");
   localStorage.removeItem("activeStudentId");
   document.querySelectorAll(".tab-view").forEach((tab) => tab.classList.remove("active"));
-  openStudentModal();
+  showLoginScreen();
 }
 
 async function createDefaultStudent() {
   try {
-    const res = await fetch(`${API_BASE}/api/onboarding/register`, {
+    const res = await apiFetch(`${API_BASE}/api/onboarding/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1344,3 +1601,28 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+// Global Window Exports for Inline HTML Event Attributes
+window.switchTab = switchTab;
+window.openEditAllowanceModal = openEditAllowanceModal;
+window.handleUpdateAllowance = handleUpdateAllowance;
+window.loadExpenses = loadExpenses;
+window.handleDeleteExpense = handleDeleteExpense;
+window.loadBudgets = loadBudgets;
+window.handleDeleteBudget = handleDeleteBudget;
+window.loadGoals = loadGoals;
+window.openDepositModal = openDepositModal;
+window.handleGoalDeposit = handleGoalDeposit;
+window.loadRecommendations = loadRecommendations;
+window.handleGenerateAiRecommendation = handleGenerateAiRecommendation;
+window.handleDeleteRecommendation = handleDeleteRecommendation;
+window.openSimulatorModal = openSimulatorModal;
+window.closeSimulatorModal = closeSimulatorModal;
+window.handleRunSimulator = handleRunSimulator;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.handleCreateExpense = handleCreateExpense;
+window.handleSetBudget = handleSetBudget;
+window.handleCreateGoal = handleCreateGoal;
+window.handleSaveTrackingSettings = handleSaveTrackingSettings;
+
