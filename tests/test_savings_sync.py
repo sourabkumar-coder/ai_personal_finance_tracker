@@ -38,4 +38,4 @@ def test_income_deposit_20_percent_auto_savings(client):
     assert len(goals) >= 1
     matching_goal = next((g for g in goals if g["id"] == data["auto_savings_synced"]["goal_id"]), None)
     assert matching_goal is not None
-    assert matching_goal["current_amount"] == 1000.0
+    assert matching_goal["current_amount"] == 3000.0  # 2000 from monthly allowance (10000) + 1000 from income deposit (5000)
