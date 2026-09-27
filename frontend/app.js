@@ -1565,25 +1565,27 @@ function escapeHtml(str) {
 
 // Global Window Exports for Inline HTML Event Attributes
 window.switchTab = switchTab;
+window.switchAuthTab = switchAuthTab;
+window.logoutStudent = logoutStudent;
 window.openEditAllowanceModal = openEditAllowanceModal;
 window.handleUpdateAllowance = handleUpdateAllowance;
 window.loadExpenses = loadExpenses;
+window.handleCreateExpense = handleCreateExpense;
 window.handleDeleteExpense = handleDeleteExpense;
 window.loadBudgets = loadBudgets;
+window.handleCreateBudget = handleCreateBudget;
 window.handleDeleteBudget = handleDeleteBudget;
 window.loadGoals = loadGoals;
+window.handleCreateGoal = handleCreateGoal;
 window.openDepositModal = openDepositModal;
-window.handleGoalDeposit = handleGoalDeposit;
+window.handleDepositGoal = handleDepositGoal;
 window.loadRecommendations = loadRecommendations;
-window.handleGenerateAiRecommendation = handleGenerateAiRecommendation;
-window.handleDeleteRecommendation = handleDeleteRecommendation;
-window.openSimulatorModal = openSimulatorModal;
-window.closeSimulatorModal = closeSimulatorModal;
-window.handleRunSimulator = handleRunSimulator;
+window.triggerGenerateRecommendations = triggerGenerateRecommendations;
+window.handleDismissRec = handleDismissRec;
+window.fillSimulationPreset = fillSimulationPreset;
+window.handleSimulateNotification = handleSimulateNotification;
+window.handleToggleSetting = handleToggleSetting;
 window.openModal = openModal;
 window.closeModal = closeModal;
-window.handleCreateExpense = handleCreateExpense;
-window.handleSetBudget = handleSetBudget;
-window.handleCreateGoal = handleCreateGoal;
-window.handleSaveTrackingSettings = handleSaveTrackingSettings;
-
+window.handleLoginStudent = handleLoginStudent;
+window.handleRegisterStudent = handleRegisterStudent;
