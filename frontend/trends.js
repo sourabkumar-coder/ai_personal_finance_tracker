@@ -27,19 +27,24 @@ const CATEGORY_PALETTE = [
 ];
 
 function getCurrencySymbol() {
+  if (typeof window !== "undefined" && window.currencySymbol) return window.currencySymbol;
   if (typeof currencySymbol !== "undefined" && currencySymbol) return currencySymbol;
   return "₹";
 }
 
 function getActiveStudentId() {
+  if (typeof window !== "undefined" && window.currentStudentId > 0) return window.currentStudentId;
   if (typeof currentStudentId !== "undefined" && currentStudentId > 0) return currentStudentId;
   const stored = parseInt(localStorage.getItem("activeStudentId"), 10);
   return stored > 0 ? stored : 0;
 }
 
 function getApiBase() {
+  if (typeof window !== "undefined" && window.API_BASE) return window.API_BASE;
   if (typeof API_BASE !== "undefined" && API_BASE) return API_BASE;
-  return "";
+  return (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+    ? "http://localhost:8000"
+    : "https://ai-personal-finance-tracker-7qp8.onrender.com";
 }
 
 /**
@@ -47,7 +52,8 @@ function getApiBase() {
  * handling) when available, falling back to a manual token header.
  */
 function trendsFetch(url) {
-  if (typeof apiFetch === "function") return apiFetch(url);
+  const fetcher = typeof window !== "undefined" && window.apiFetch ? window.apiFetch : (typeof apiFetch === "function" ? apiFetch : null);
+  if (fetcher) return fetcher(url);
   let token = null;
   try {
     token = localStorage.getItem("authToken");

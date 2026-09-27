@@ -10,6 +10,10 @@ const API_BASE =
     ? "http://localhost:8000"
     : "https://ai-personal-finance-tracker-7qp8.onrender.com";
 
+if (typeof window !== "undefined") {
+  window.API_BASE = API_BASE;
+}
+
 // Global State
 let currentStudentId = parseInt(localStorage.getItem("activeStudentId")) || 0;
 let currentStudent = null;
@@ -36,6 +40,10 @@ async function apiFetch(endpoint, options = {}) {
     showToast("Session Expired", "Please login again.", "error");
   }
   return res;
+}
+
+if (typeof window !== "undefined") {
+  window.apiFetch = apiFetch;
 }
 
 // Initialize when DOM is ready
