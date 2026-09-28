@@ -1,6 +1,15 @@
+import os
+import sys
 import logging
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
+
+# Ensure backend directory is in sys.path for direct execution
+backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if backend_root not in sys.path:
+    sys.path.insert(0, backend_root)
+
+from app.database.models import Base
 
 logger = logging.getLogger("migration")
 
@@ -18,6 +27,7 @@ EXPENSES_COLUMN_DEFINITIONS = [
     ("confidence", "FLOAT NOT NULL DEFAULT 1.0"),
     ("is_automatically_detected", "BOOLEAN NOT NULL DEFAULT 0"),
     ("fingerprint", "VARCHAR(64)"),
+    ("split_bill_id", "INTEGER"),
     ("created_at", "DATETIME"),
     ("updated_at", "DATETIME"),
 ]
@@ -29,6 +39,7 @@ def run_migrations(engine: Engine):
     all SQLAlchemy model fields are present in the underlying tables.
     Preserves all existing user and expense records.
     """
+    Base.metadata.create_all(bind=engine)
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
 

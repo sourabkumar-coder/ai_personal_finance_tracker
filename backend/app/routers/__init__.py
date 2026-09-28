@@ -7,6 +7,7 @@ from app.routers.goals import router as goals_router
 from app.routers.analytics import router as analytics_router
 from app.routers.recommendations import router as recommendations_router
 from app.routers.transactions import router as transactions_router
+from app.routers.split_bills import router as split_bills_router
 
 __all__ = [
     "auth_router",
@@ -17,4 +18,5 @@ __all__ = [
     "analytics_router",
     "recommendations_router",
     "transactions_router",
+    "split_bills_router",
 ]

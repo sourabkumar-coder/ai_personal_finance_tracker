@@ -175,6 +175,11 @@
             <span>Auto-Tracking</span>
           </button>
         </li>
+        <li class="nav-item">
+          <button id="nav-btn-split-bills" onclick="switchTab('split-bills')">
+            <span>Split Bills</span>
+          </button>
+        </li>
       </ul>
 
       <!-- User Profile in Sidebar -->
@@ -669,6 +674,120 @@
             </div>
           </div>
         </section>
+
+        <!-- ================= SPLIT BILLS TAB ================= -->
+        <section id="tab-split-bills" class="tab-view">
+          <!-- Split Summary Metrics -->
+          <div class="metrics-grid split-metrics-grid">
+            <div class="metric-card success">
+              <span class="metric-label">Owed to You (Receivables)</span>
+              <div class="metric-value text-emerald" id="val-split-owed-to-you">₹0.00</div>
+              <div class="metric-subtext">Friends will pay you back</div>
+            </div>
+
+            <div class="metric-card warning">
+              <span class="metric-label">You Owe (Payables)</span>
+              <div class="metric-value text-amber" id="val-split-you-owe">₹0.00</div>
+              <div class="metric-subtext">Pending settlements to friends</div>
+            </div>
+
+            <div class="metric-card">
+              <span class="metric-label">Net Split Balance</span>
+              <div class="metric-value" id="val-split-net-balance">₹0.00</div>
+              <div class="metric-subtext" id="val-split-net-subtext">All debts settled</div>
+            </div>
+          </div>
+
+          <!-- Action Bar with Group Filter and CTA buttons -->
+          <div class="split-action-bar glass-card">
+            <div class="split-groups-filter" id="split-groups-chips">
+              <button class="filter-chip active" id="chip-group-all" onclick="filterSplitGroup(null)">All Splits</button>
+            </div>
+            <div class="split-action-buttons">
+              <button class="btn btn-secondary btn-sm" onclick="openModal('modal-create-group')">
+                <span>+ New Group</span>
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="openModalSplitBill()">
+                <span>+ Split a Bill</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Two-Column Split Layout -->
+          <div class="dashboard-grid split-dashboard-grid">
+            <!-- Left: Who Owes Who / Friends Balances -->
+            <div class="glass-card">
+              <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.05rem;">Who Owes Who</h3>
+                <span class="badge-status-online" id="badge-active-splits-count">0 Active</span>
+              </div>
+              <div class="friend-balances-list" id="friend-balances-container" style="margin-top: 1rem;">
+                <div class="empty-state-card" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                  <p>No split debts yet! Create a group or split a bill to get started.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Recent Shared Bills & Settlements History -->
+            <div class="glass-card">
+              <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div class="split-tab-pills">
+                  <button class="pill-btn active" id="btn-subtab-bills" onclick="switchSplitSubtab('bills')">Shared Bills</button>
+                  <button class="pill-btn" id="btn-subtab-settlements" onclick="switchSplitSubtab('settlements')">Settlements</button>
+                </div>
+                <button class="btn btn-magic btn-xs" onclick="openModalSplitBill()">
+                  <span>+ Quick Split</span>
+                </button>
+              </div>
+
+              <!-- Shared Bills Subview -->
+              <div id="split-subview-bills" class="split-subview active">
+                <div class="table-responsive">
+                  <table class="data-table" id="table-split-bills">
+                    <thead>
+                      <tr>
+                        <th>Date & Title</th>
+                        <th>Group</th>
+                        <th>Total</th>
+                        <th>Payer</th>
+                        <th>Your Share</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-split-bills">
+                      <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading shared bills...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Settlements Subview -->
+              <div id="split-subview-settlements" class="split-subview" style="display: none;">
+                <div class="table-responsive">
+                  <table class="data-table" id="table-split-settlements">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Note</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-split-settlements">
+                      <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No settlements recorded yet.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -921,6 +1040,238 @@
           <button type="submit" class="btn btn-primary">Save Allowance</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= SPLIT BILLS MODALS ================= -->
+
+  <!-- Split Bill Modal -->
+  <div class="modal-backdrop" id="modal-split-bill">
+    <div class="modal-window modal-lg">
+      <div class="modal-header">
+        <h3>Split a Bill with Friends</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-split-bill')">&times;</button>
+      </div>
+      <form id="form-split-bill" onsubmit="handleCreateSplitBill(event)">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="split-title">Bill Title / Description</label>
+            <input type="text" id="split-title" class="form-control" placeholder="e.g. Friday Pizza, Flat WiFi, Uber Cab" required>
+          </div>
+          <div class="form-group flex-1">
+            <label for="split-total-amount">Total Amount (₹)</label>
+            <input type="number" step="0.50" min="1" id="split-total-amount" class="form-control" placeholder="1200.00" oninput="recalculateSplitShares()" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="split-group-select">Split Group</label>
+            <select id="split-group-select" class="form-control" onchange="onSplitGroupSelected()">
+              <option value="">Direct / Standalone Friends</option>
+              <!-- Dynamically populated groups -->
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="split-category">Category</label>
+            <select id="split-category" class="form-control">
+              <option value="Food">Food & Dining</option>
+              <option value="Rent">Rent & Housing</option>
+              <option value="Utilities">Utilities & WiFi</option>
+              <option value="Travel">Travel & Cabs</option>
+              <option value="Entertainment">Entertainment & Movies</option>
+              <option value="Shopping">Shopping & Groceries</option>
+              <option value="Others">Others</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="split-date">Date</label>
+            <input type="date" id="split-date" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="split-payer-select">Who Paid?</label>
+            <select id="split-payer-select" class="form-control">
+              <option value="You">You (paid entire bill)</option>
+              <!-- Populated dynamically with friends -->
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label>Split Method</label>
+            <div class="split-type-toggle">
+              <button type="button" class="btn-toggle-option active" id="btn-split-equal" onclick="setSplitType('EQUAL')">Split Equally</button>
+              <button type="button" class="btn-toggle-option" id="btn-split-exact" onclick="setSplitType('EXACT')">Exact Amounts</button>
+            </div>
+            <input type="hidden" id="split-type" value="EQUAL">
+          </div>
+        </div>
+
+        <!-- Participants & Dynamic Shares Breakdown -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label style="margin: 0;">Split Among Participants</label>
+            <span id="split-shares-summary" style="font-size: 0.85rem; color: var(--accent-indigo); font-weight: 600;">₹0.00 / person</span>
+          </div>
+
+          <div id="split-participants-list" class="split-participants-box">
+            <!-- Dynamic participant rows / chips -->
+          </div>
+
+          <!-- Quick Add Friend Row -->
+          <div class="quick-add-participant-row" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+            <input type="text" id="input-quick-friend-name" class="form-control form-control-sm" placeholder="Add friend name (e.g. Rohan, Priya)...">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addQuickParticipant()">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Expense Sync & Notes -->
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <label class="custom-checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem;">
+            <input type="checkbox" id="split-sync-expense" checked style="accent-color: var(--primary); width: 1.1rem; height: 1.1rem;">
+            <span><strong>Auto-sync my personal share to My Expenses</strong> (counts towards your monthly budget & analytics)</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label for="split-notes">Notes / Location (Optional)</label>
+          <input type="text" id="split-notes" class="form-control" placeholder="e.g. Olive Bistro bill, split 3 ways">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-split-bill')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-split-bill">Save Split Bill</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Split Group Modal -->
+  <div class="modal-backdrop" id="modal-create-group">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Create New Split Group</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-create-group')">&times;</button>
+      </div>
+      <form id="form-create-group" onsubmit="handleCreateGroup(event)">
+        <div class="form-group">
+          <label for="group-name">Group Name</label>
+          <input type="text" id="group-name" class="form-control" placeholder="e.g. Flat 204 Roommates, Goa Trip, Canteen Squad" required>
+        </div>
+        <div class="form-group">
+          <label for="group-desc">Description (Optional)</label>
+          <input type="text" id="group-desc" class="form-control" placeholder="e.g. Apartment rent and grocery splits">
+        </div>
+
+        <div class="form-group">
+          <label>Group Members / Friends</label>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 0.5rem 0;">You are included by default. Add your roommates or friends:</p>
+          <div id="new-group-members-container" class="members-input-container">
+            <div class="member-input-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <input type="text" class="form-control new-member-name" placeholder="Friend's Full Name" required>
+              <input type="text" class="form-control new-member-upi" placeholder="UPI ID (optional)">
+            </div>
+            <div class="member-input-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <input type="text" class="form-control new-member-name" placeholder="Friend's Full Name">
+              <input type="text" class="form-control new-member-upi" placeholder="UPI ID (optional)">
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addNewGroupMemberInput()" style="margin-top: 0.25rem;">+ Add Another Member</button>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-group')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-create-group">Create Group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settle Up Modal -->
+  <div class="modal-backdrop" id="modal-settle-up">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Record Settlement</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-settle-up')">&times;</button>
+      </div>
+      <form id="form-settle-up" onsubmit="handleSettleUp(event)">
+        <input type="hidden" id="settle-friend-name">
+        <input type="hidden" id="settle-group-id">
+
+        <div class="settle-summary-card glass-card" style="padding: 1rem; margin-bottom: 1rem; text-align: center;">
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;" id="settle-direction-text">Settling with</div>
+          <h2 style="margin: 0; color: var(--text-main);" id="settle-display-name">Friend</h2>
+          <div style="font-size: 1.4rem; font-weight: 700; margin-top: 0.5rem; color: var(--accent-emerald);" id="settle-display-amount">₹0.00</div>
+        </div>
+
+        <div class="form-group">
+          <label for="settle-amount">Settlement Amount (₹)</label>
+          <input type="number" step="0.50" min="0.50" id="settle-amount" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label for="settle-direction-select">Payment Direction</label>
+          <select id="settle-direction-select" class="form-control">
+            <option value="THEY_PAID_YOU">Friend paid You (Clears what they owe)</option>
+            <option value="YOU_PAID_THEM">You paid Friend (Clears what you owe)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="settle-method">Payment Method</label>
+          <select id="settle-method" class="form-control">
+            <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+            <option value="Cash">Cash in Hand</option>
+            <option value="Bank Transfer">Bank Transfer / IMPS</option>
+          </select>
+        </div>
+
+        <!-- UPI Direct Pay Action for mobile/desktop -->
+        <div id="settle-upi-box" style="display: none; margin-bottom: 1rem;">
+          <a id="settle-upi-link" href="#" class="btn btn-magic btn-sm" style="width: 100%; justify-content: center; text-decoration: none;">
+            <span>Pay via UPI App (GPay / PhonePe)</span>
+          </a>
+        </div>
+
+        <div class="form-group">
+          <label for="settle-notes">Notes (Optional)</label>
+          <input type="text" id="settle-notes" class="form-control" placeholder="e.g. Settle via GPay ref 928374">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-settle-up')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm Settlement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- WhatsApp Reminder Modal -->
+  <div class="modal-backdrop" id="modal-whatsapp-reminder">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>WhatsApp Payment Reminder</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-whatsapp-reminder')">&times;</button>
+      </div>
+      <div style="padding: 0.5rem 0;">
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          Send a polite, pre-formatted payment reminder with breakdown directly to your friend on WhatsApp.
+        </p>
+        <div class="form-group">
+          <label for="wa-reminder-text">Message Preview</label>
+          <textarea id="wa-reminder-text" class="form-control" rows="4"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-whatsapp-reminder')">Close</button>
+        <button type="button" class="btn btn-secondary" onclick="copyWhatsAppMessage()">
+          <span>📋 Copy Message</span>
+        </button>
+        <button type="button" class="btn btn-primary" onclick="openWhatsAppChat()">
+          <span>💬 Open in WhatsApp</span>
+        </button>
+      </div>
     </div>
   </div>
 

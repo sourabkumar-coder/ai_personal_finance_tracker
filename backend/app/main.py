@@ -20,6 +20,7 @@ from app.routers import (
     analytics_router,
     recommendations_router,
     transactions_router,
+    split_bills_router,
 )
 
 # Initialize database tables and run idempotent schema migrations
@@ -50,6 +51,7 @@ app.include_router(goals_router)
 app.include_router(analytics_router)
 app.include_router(recommendations_router)
 app.include_router(transactions_router)
+app.include_router(split_bills_router)
 
 
 @app.get("/", tags=["Health"])

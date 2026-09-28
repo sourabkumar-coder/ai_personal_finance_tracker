@@ -437,6 +437,7 @@ function loadAllViews() {
   loadGoals();
   loadRecommendations();
   loadTrackingSettings();
+  loadSplitBalances();
   if (typeof loadTrends === "function") loadTrends();
 }
 
@@ -538,6 +539,7 @@ function switchTab(tabId) {
     budgets: "Monthly Budgets",
     goals: "Financial Savings Goals",
     "auto-tracking": "Automatic UPI & Bank Detection",
+    "split-bills": "Split Bills & Shared Expenses",
   };
   const topHeading = document.getElementById("top-page-heading");
   if (topHeading) topHeading.textContent = headingMap[tabId] || "Financial Overview";
@@ -552,6 +554,9 @@ function switchTab(tabId) {
   if (tabId === "auto-tracking") {
     loadTrackingStatus();
     loadTrackingSettings();
+  }
+  if (tabId === "split-bills") {
+    loadSplitBillsView();
   }
 }
 
@@ -1562,6 +1567,1149 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+// ==========================================================================
+// Split Bills Feature Module
+// ==========================================================================
+
+let currentSplitGroupId = null;
+let currentSplitGroups = [];
+let splitBillParticipants = [];
+let currentWhatsAppReminderText = "";
+
+/**
+ * Main coordinator to load all Split Bills sub-views
+ */
+async function loadSplitBillsView() {
+  if (!currentStudentId || currentStudentId <= 0) return;
+  await Promise.all([
+    loadSplitBalances(),
+    loadSplitGroups(),
+    loadSplitBillsList(),
+    loadSplitSettlements(),
+  ]);
+}
+
+/**
+ * Fetch and render consolidated balances and per-friend ledger
+ */
+async function loadSplitBalances() {
+  if (!currentStudentId || currentStudentId <= 0) return;
+  const container = document.getElementById("friend-balances-container");
+  const owedToYouEl = document.getElementById("val-split-owed-to-you");
+  const youOweEl = document.getElementById("val-split-you-owe");
+  const netBalanceEl = document.getElementById("val-split-net-balance");
+  const netSubtextEl = document.getElementById("val-split-net-subtext");
+  const activeCountBadge = document.getElementById("badge-active-splits-count");
+
+  try {
+    const url = `${API_BASE}/api/split-bills/balances/${currentStudentId}${
+      currentSplitGroupId ? `?group_id=${currentSplitGroupId}` : ""
+    }`;
+    const res = await apiFetch(url);
+    if (!res.ok) {
+      console.warn("Could not load split balances:", res.status);
+      return;
+    }
+    const data = await res.json();
+
+    const owedToYou = data.total_owed_to_you || 0;
+    const youOwe = data.total_you_owe || 0;
+    const net = data.net_balance || 0;
+    const activeCount = data.active_splits_count || 0;
+
+    if (owedToYouEl) owedToYouEl.textContent = `${currencySymbol}${owedToYou.toFixed(2)}`;
+    if (youOweEl) youOweEl.textContent = `${currencySymbol}${youOwe.toFixed(2)}`;
+    if (activeCountBadge) activeCountBadge.textContent = `${activeCount} Active`;
+
+    if (netBalanceEl) {
+      if (net > 0.01) {
+        netBalanceEl.className = "metric-value text-emerald";
+        netBalanceEl.textContent = `+${currencySymbol}${net.toFixed(2)}`;
+      } else if (net < -0.01) {
+        netBalanceEl.className = "metric-value text-amber";
+        netBalanceEl.textContent = `-${currencySymbol}${Math.abs(net).toFixed(2)}`;
+      } else {
+        netBalanceEl.className = "metric-value";
+        netBalanceEl.textContent = `${currencySymbol}0.00`;
+      }
+    }
+
+    if (netSubtextEl) {
+      if (net > 0.01) {
+        netSubtextEl.textContent = `You are owed ${currencySymbol}${net.toFixed(2)} in total`;
+      } else if (net < -0.01) {
+        netSubtextEl.textContent = `You owe ${currencySymbol}${Math.abs(net).toFixed(2)} in total`;
+      } else {
+        netSubtextEl.textContent = "All debts settled";
+      }
+    }
+
+    // Render Friends Balances List
+    if (!container) return;
+    const friends = data.friends || [];
+
+    if (friends.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state-card" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
+          <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🤝</div>
+          <h4 style="margin: 0 0 0.35rem 0; color: var(--text-main); font-size: 1rem;">No Shared Debts Yet</h4>
+          <p style="font-size: 0.85rem; max-width: 320px; margin: 0 auto 1.25rem auto;">Create a split group or log a shared dinner, flat bill, or ride to track who owes who.</p>
+          <button class="btn btn-primary btn-sm" onclick="openModalSplitBill()">+ Split a Bill</button>
+        </div>
+      `;
+      return;
+    }
+
+    let html = "";
+    friends.forEach((f) => {
+      const isOwedToYou = f.status === "OWED_TO_YOU";
+      const isYouOwe = f.status === "YOU_OWE";
+      const isSettled = f.status === "SETTLED";
+
+      const initials = (f.name || "F")
+        .split(" ")
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase();
+
+      const absAmount = Math.abs(f.net_balance || 0);
+
+      let statusBadge = "";
+      let amountClass = "";
+      let actionButtons = "";
+
+      if (isOwedToYou) {
+        statusBadge = `<span class="badge-pill" style="background: rgba(15, 68, 34, 0.1); color: var(--accent-emerald); font-weight: 600;">Owes You</span>`;
+        amountClass = "text-emerald";
+        const waMsg =
+          f.whatsapp_message ||
+          `Hey ${f.name}, you have a pending split of ${currencySymbol}${absAmount.toFixed(
+            2
+          )} on SmartFinance. Please settle when you get a chance!`;
+        actionButtons = `
+          <button class="btn btn-secondary btn-xs" onclick="openWhatsAppModal('${escapeHtml(
+            f.name
+          )}', ${absAmount}, '${encodeURIComponent(waMsg)}')">
+            <span>💬 Remind</span>
+          </button>
+          <button class="btn btn-primary btn-xs" onclick="openModalRecordSettlement('${escapeHtml(
+            f.name
+          )}', ${absAmount}, 'THEY_PAID_YOU', ${f.group_id || "null"}, null)">
+            <span>✓ Settle Up</span>
+          </button>
+        `;
+      } else if (isYouOwe) {
+        statusBadge = `<span class="badge-pill" style="background: rgba(217, 119, 6, 0.12); color: var(--accent-amber); font-weight: 600;">You Owe</span>`;
+        amountClass = "text-amber";
+        const upiAction = f.upi_link
+          ? `<a href="${f.upi_link}" class="btn btn-magic btn-xs" style="text-decoration:none;" target="_blank"><span>⚡ Pay UPI</span></a>`
+          : "";
+        actionButtons = `
+          ${upiAction}
+          <button class="btn btn-primary btn-xs" onclick="openModalRecordSettlement('${escapeHtml(
+            f.name
+          )}', ${absAmount}, 'YOU_PAID_THEM', ${f.group_id || "null"}, '${f.upi_id || ""}')">
+            <span>✓ Settle Up</span>
+          </button>
+        `;
+      } else {
+        statusBadge = `<span class="badge-pill" style="background: #E2E8F0; color: var(--text-muted);">Settled</span>`;
+        amountClass = "text-muted";
+        actionButtons = `
+          <button class="btn btn-ghost btn-xs" onclick="openModalSplitBill('${escapeHtml(f.name)}')">
+            <span>+ New Bill</span>
+          </button>
+        `;
+      }
+
+      html += `
+        <div class="friend-balance-card glass-card">
+          <div class="friend-card-header">
+            <div class="friend-avatar-wrap">
+              <div class="friend-avatar">${initials}</div>
+              <div>
+                <div class="friend-name-text">${escapeHtml(f.name)}</div>
+                ${f.group_name ? `<div class="friend-group-tag">👥 ${escapeHtml(f.group_name)}</div>` : ""}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="friend-balance-amount ${amountClass}">
+                ${isSettled ? `${currencySymbol}0.00` : `${currencySymbol}${absAmount.toFixed(2)}`}
+              </div>
+              <div style="margin-top: 0.15rem;">${statusBadge}</div>
+            </div>
+          </div>
+          <div class="friend-card-actions">
+            ${actionButtons}
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  } catch (err) {
+    console.error("Error loading split balances:", err);
+  }
+}
+
+/**
+ * Load student's split groups and render filter chips
+ */
+async function loadSplitGroups() {
+  if (!currentStudentId || currentStudentId <= 0) return;
+  const chipsContainer = document.getElementById("split-groups-chips");
+  const groupSelect = document.getElementById("split-group-select");
+
+  try {
+    const res = await apiFetch(`${API_BASE}/api/split-bills/groups/${currentStudentId}`);
+    if (!res.ok) return;
+    currentSplitGroups = await res.json();
+
+    // Render filter chips
+    if (chipsContainer) {
+      let chipsHtml = `
+        <button class="filter-chip ${currentSplitGroupId === null ? "active" : ""}" id="chip-group-all" onclick="filterSplitGroup(null)">
+          All Splits
+        </button>
+      `;
+      currentSplitGroups.forEach((g) => {
+        const isActive = currentSplitGroupId === g.id;
+        chipsHtml += `
+          <button class="filter-chip ${isActive ? "active" : ""}" id="chip-group-${g.id}" onclick="filterSplitGroup(${g.id})">
+            ${escapeHtml(g.name)} (${g.bills_count || 0})
+          </button>
+        `;
+      });
+      chipsContainer.innerHTML = chipsHtml;
+    }
+
+    // Populate split bill modal group select
+    if (groupSelect) {
+      let optionsHtml = `<option value="">Direct / Standalone Friends</option>`;
+      currentSplitGroups.forEach((g) => {
+        const isSelected = currentSplitGroupId === g.id ? "selected" : "";
+        optionsHtml += `<option value="${g.id}" ${isSelected}>${escapeHtml(g.name)} (${(g.members || []).length} members)</option>`;
+      });
+      groupSelect.innerHTML = optionsHtml;
+    }
+  } catch (err) {
+    console.error("Error loading split groups:", err);
+  }
+}
+
+/**
+ * Filter Split Bills by Split Group (or null for all)
+ */
+function filterSplitGroup(groupId) {
+  currentSplitGroupId = groupId;
+  document.querySelectorAll(".split-groups-filter .filter-chip").forEach((chip) => chip.classList.remove("active"));
+  const targetChip =
+    groupId === null
+      ? document.getElementById("chip-group-all")
+      : document.getElementById(`chip-group-${groupId}`);
+  if (targetChip) targetChip.classList.add("active");
+
+  loadSplitBalances();
+  loadSplitBillsList();
+  loadSplitSettlements();
+}
+
+/**
+ * Load Shared Bills Table
+ */
+async function loadSplitBillsList() {
+  if (!currentStudentId || currentStudentId <= 0) return;
+  const tbody = document.getElementById("tbody-split-bills");
+  if (!tbody) return;
+
+  try {
+    const url = `${API_BASE}/api/split-bills/bills/${currentStudentId}${
+      currentSplitGroupId ? `?group_id=${currentSplitGroupId}` : ""
+    }`;
+    const res = await apiFetch(url);
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Error loading shared bills.</td></tr>`;
+      return;
+    }
+    const bills = await res.json();
+
+    if (bills.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+            No shared bills found. Click <strong>+ Split a Bill</strong> to log your first shared expense!
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    let html = "";
+    bills.forEach((b) => {
+      const isYouPayer =
+        (b.payer_name || "").toLowerCase() === "you" ||
+        (currentStudent && (b.payer_name || "").toLowerCase() === currentStudent.name.toLowerCase());
+      const impactText = isYouPayer
+        ? `<div style="font-size: 0.76rem; color: var(--accent-emerald); font-weight: 600;">+${currencySymbol}${(
+            b.your_net_impact || 0
+          ).toFixed(2)} to collect</div>`
+        : `<div style="font-size: 0.76rem; color: var(--accent-amber); font-weight: 600;">-${currencySymbol}${(
+            b.your_share || 0
+          ).toFixed(2)} you owe</div>`;
+
+      html += `
+        <tr>
+          <td>
+            <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(b.title)}</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
+              <span>${b.date}</span> · <span class="tag-badge">${escapeHtml(b.category)}</span>
+              ${
+                b.split_type === "EXACT"
+                  ? '<span class="badge-pill" style="font-size:0.68rem; margin-left:0.25rem;">Exact</span>'
+                  : ""
+              }
+            </div>
+          </td>
+          <td>
+            ${
+              b.group_name
+                ? `<span class="badge-pill">${escapeHtml(b.group_name)}</span>`
+                : '<span style="color:var(--text-muted); font-size:0.82rem;">Direct</span>'
+            }
+          </td>
+          <td style="font-weight: 700; color: var(--text-main);">
+            ${currencySymbol}${b.total_amount.toFixed(2)}
+          </td>
+          <td>
+            <span style="font-weight: 500;">${escapeHtml(b.payer_name)}</span>
+          </td>
+          <td>
+            <div style="font-weight: 600;">${currencySymbol}${(b.your_share || 0).toFixed(2)}</div>
+            ${impactText}
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-xs text-rose" onclick="handleDeleteSplitBill(${b.id})" title="Delete Split Bill">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+  } catch (err) {
+    console.error("Error loading split bills:", err);
+  }
+}
+
+/**
+ * Load Settlements History Table
+ */
+async function loadSplitSettlements() {
+  if (!currentStudentId || currentStudentId <= 0) return;
+  const tbody = document.getElementById("tbody-split-settlements");
+  if (!tbody) return;
+
+  try {
+    const url = `${API_BASE}/api/split-bills/settlements/${currentStudentId}${
+      currentSplitGroupId ? `?group_id=${currentSplitGroupId}` : ""
+    }`;
+    const res = await apiFetch(url);
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Error loading settlements.</td></tr>`;
+      return;
+    }
+    const settlements = await res.json();
+
+    if (settlements.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+            No settlements recorded yet. Settle up with a friend to see completed payments here!
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    let html = "";
+    settlements.forEach((s) => {
+      html += `
+        <tr>
+          <td style="font-size: 0.85rem; color: var(--text-muted);">${s.settlement_date}</td>
+          <td style="font-weight: 600;">${escapeHtml(s.from_name)}</td>
+          <td style="font-weight: 600;">${escapeHtml(s.to_name)}</td>
+          <td style="font-weight: 700; color: var(--accent-emerald);">
+            ${currencySymbol}${s.amount.toFixed(2)}
+          </td>
+          <td>
+            <span class="badge-pill">${escapeHtml(s.payment_method)}</span>
+          </td>
+          <td>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.82rem; color: var(--text-muted);">${escapeHtml(s.notes || "—")}</span>
+              <button class="btn btn-ghost btn-xs text-rose" onclick="handleDeleteSettlement(${s.id})" title="Delete Settlement Record">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+  } catch (err) {
+    console.error("Error loading split settlements:", err);
+  }
+}
+
+/**
+ * Switch Sub-tabs between Shared Bills and Settlements
+ */
+function switchSplitSubtab(subtab) {
+  const btnBills = document.getElementById("btn-subtab-bills");
+  const btnSettlements = document.getElementById("btn-subtab-settlements");
+  const subviewBills = document.getElementById("split-subview-bills");
+  const subviewSettlements = document.getElementById("split-subview-settlements");
+
+  if (subtab === "bills") {
+    if (btnBills) btnBills.classList.add("active");
+    if (btnSettlements) btnSettlements.classList.remove("active");
+    if (subviewBills) {
+      subviewBills.classList.add("active");
+      subviewBills.style.display = "block";
+    }
+    if (subviewSettlements) {
+      subviewSettlements.classList.remove("active");
+      subviewSettlements.style.display = "none";
+    }
+    loadSplitBillsList();
+  } else {
+    if (btnSettlements) btnSettlements.classList.add("active");
+    if (btnBills) btnBills.classList.remove("active");
+    if (subviewSettlements) {
+      subviewSettlements.classList.add("active");
+      subviewSettlements.style.display = "block";
+    }
+    if (subviewBills) {
+      subviewBills.classList.remove("active");
+      subviewBills.style.display = "none";
+    }
+    loadSplitSettlements();
+  }
+}
+
+/**
+ * Open Modal to Split a Bill
+ */
+function openModalSplitBill(initialFriendName = null) {
+  const form = document.getElementById("form-split-bill");
+  if (form) form.reset();
+
+  const dateEl = document.getElementById("split-date");
+  if (dateEl) dateEl.value = new Date().toISOString().split("T")[0];
+
+  const groupSelect = document.getElementById("split-group-select");
+  if (groupSelect) {
+    groupSelect.value = currentSplitGroupId !== null ? String(currentSplitGroupId) : "";
+  }
+
+  setSplitType("EQUAL");
+
+  // Initial participants
+  splitBillParticipants = [{ name: "You", id: null, amount: 0, isYou: true }];
+
+  // If a group is currently active, populate its members
+  if (groupSelect && groupSelect.value) {
+    onSplitGroupSelected();
+  } else if (initialFriendName && initialFriendName !== "You") {
+    splitBillParticipants.push({ name: initialFriendName, id: null, amount: 0, isYou: false });
+    renderSplitParticipantsList();
+    updatePayerSelect();
+  } else {
+    renderSplitParticipantsList();
+    updatePayerSelect();
+  }
+
+  recalculateSplitShares();
+
+  const friendInput = document.getElementById("input-quick-friend-name");
+  if (friendInput) {
+    friendInput.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addQuickParticipant();
+      }
+    };
+  }
+
+  openModal("modal-split-bill");
+}
+
+/**
+ * Handle group selection inside Split Bill modal
+ */
+function onSplitGroupSelected() {
+  const groupSelect = document.getElementById("split-group-select");
+  const selectedGroupId = groupSelect && groupSelect.value ? parseInt(groupSelect.value) : null;
+
+  splitBillParticipants = [{ name: "You", id: null, amount: 0, isYou: true }];
+
+  if (selectedGroupId && currentSplitGroups) {
+    const grp = currentSplitGroups.find((g) => g.id === selectedGroupId);
+    if (grp && grp.members) {
+      grp.members.forEach((m) => {
+        const mName = m.name.trim();
+        if (
+          mName.toLowerCase() !== "you" &&
+          (!currentStudent || mName.toLowerCase() !== currentStudent.name.toLowerCase())
+        ) {
+          splitBillParticipants.push({
+            name: mName,
+            id: m.id,
+            amount: 0,
+            isYou: false,
+          });
+        }
+      });
+    }
+  }
+
+  renderSplitParticipantsList();
+  updatePayerSelect();
+  recalculateSplitShares();
+}
+
+/**
+ * Update the 'Who Paid?' select dropdown
+ */
+function updatePayerSelect() {
+  const payerSelect = document.getElementById("split-payer-select");
+  if (!payerSelect) return;
+  const currentVal = payerSelect.value;
+
+  let optionsHtml = `<option value="You">You (paid entire bill)</option>`;
+  splitBillParticipants.forEach((p) => {
+    if (!p.isYou) {
+      optionsHtml += `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`;
+    }
+  });
+
+  payerSelect.innerHTML = optionsHtml;
+  if (
+    currentVal &&
+    splitBillParticipants.some((p) => p.name === currentVal || (p.isYou && currentVal === "You"))
+  ) {
+    payerSelect.value = currentVal;
+  }
+}
+
+/**
+ * Switch Split Method (EQUAL vs EXACT)
+ */
+function setSplitType(type) {
+  const typeInput = document.getElementById("split-type");
+  const btnEqual = document.getElementById("btn-split-equal");
+  const btnExact = document.getElementById("btn-split-exact");
+
+  if (typeInput) typeInput.value = type;
+  if (type === "EXACT") {
+    if (btnExact) btnExact.classList.add("active");
+    if (btnEqual) btnEqual.classList.remove("active");
+  } else {
+    if (btnEqual) btnEqual.classList.add("active");
+    if (btnExact) btnExact.classList.remove("active");
+  }
+
+  renderSplitParticipantsList();
+  recalculateSplitShares();
+}
+
+/**
+ * Render dynamic participants inside Split Bill modal
+ */
+function renderSplitParticipantsList() {
+  const container = document.getElementById("split-participants-list");
+  if (!container) return;
+
+  const splitType = (document.getElementById("split-type") || {}).value || "EQUAL";
+  const isExact = splitType === "EXACT";
+
+  let html = "";
+  splitBillParticipants.forEach((p, idx) => {
+    const initials = p.name
+      .split(" ")
+      .map((s) => s[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+
+    html += `
+      <div class="participant-item-row">
+        <div class="participant-info">
+          <div class="friend-avatar" style="width: 28px; height: 28px; font-size: 0.75rem;">${initials}</div>
+          <span>${escapeHtml(p.name)}</span>
+          ${p.isYou ? '<span class="participant-badge-you">You</span>' : ""}
+        </div>
+        <div class="participant-share-display">
+          ${
+            isExact
+              ? `<span style="font-size:0.85rem; color:var(--text-muted);">${currencySymbol}</span>
+                 <input type="number" step="0.50" min="0" class="form-control participant-exact-input" 
+                        value="${p.amount || ""}" placeholder="0.00" 
+                        oninput="onParticipantExactAmountChange(${idx}, this.value)">`
+              : `<span id="share-display-${idx}" style="font-weight: 600; color: var(--text-main); font-size: 0.88rem;">${currencySymbol}0.00</span>`
+          }
+          ${
+            !p.isYou
+              ? `<button type="button" class="btn-remove-participant" onclick="removeParticipant(${idx})" title="Remove participant">&times;</button>`
+              : '<span style="width: 1.25rem;"></span>'
+          }
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+/**
+ * Handler for exact amount change on participant row
+ */
+function onParticipantExactAmountChange(index, val) {
+  if (splitBillParticipants[index]) {
+    splitBillParticipants[index].amount = parseFloat(val) || 0;
+  }
+  recalculateSplitShares();
+}
+
+/**
+ * Add a quick friend participant by name
+ */
+function addQuickParticipant() {
+  const input = document.getElementById("input-quick-friend-name");
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) return;
+
+  const exists = splitBillParticipants.some((p) => p.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    showToast("Already Added", `${name} is already in the split list.`, "info");
+    input.value = "";
+    return;
+  }
+
+  splitBillParticipants.push({
+    name: name,
+    id: null,
+    amount: 0,
+    isYou: false,
+  });
+
+  input.value = "";
+  renderSplitParticipantsList();
+  updatePayerSelect();
+  recalculateSplitShares();
+}
+
+/**
+ * Remove participant from the active split bill
+ */
+function removeParticipant(index) {
+  if (splitBillParticipants[index] && splitBillParticipants[index].isYou) {
+    showToast("Notice", "You cannot remove yourself from the bill.", "info");
+    return;
+  }
+  splitBillParticipants.splice(index, 1);
+  renderSplitParticipantsList();
+  updatePayerSelect();
+  recalculateSplitShares();
+}
+
+/**
+ * Recalculate shares summary (Equal or Exact)
+ */
+function recalculateSplitShares() {
+  const totalInput = document.getElementById("split-total-amount");
+  const summaryEl = document.getElementById("split-shares-summary");
+  const splitType = (document.getElementById("split-type") || {}).value || "EQUAL";
+
+  const total = parseFloat(totalInput ? totalInput.value : 0) || 0;
+  const n = splitBillParticipants.length;
+
+  if (!summaryEl) return;
+
+  if (splitType === "EQUAL") {
+    if (n === 0 || total <= 0) {
+      summaryEl.textContent = `${currencySymbol}0.00 / person`;
+      return;
+    }
+    const share = (total / n).toFixed(2);
+    summaryEl.textContent = `${currencySymbol}${share} / person (${n} splitters)`;
+
+    // Update each participant's share display
+    splitBillParticipants.forEach((p, idx) => {
+      p.amount = parseFloat(share);
+      const displayEl = document.getElementById(`share-display-${idx}`);
+      if (displayEl) displayEl.textContent = `${currencySymbol}${share}`;
+    });
+  } else {
+    // Exact split breakdown
+    const currentSum = splitBillParticipants.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+    const diff = total - currentSum;
+
+    if (total <= 0) {
+      summaryEl.innerHTML = `<span style="color:var(--text-muted);">Enter total bill amount</span>`;
+    } else if (Math.abs(diff) < 0.05) {
+      summaryEl.innerHTML = `<span style="color: var(--accent-emerald); font-weight:700;">✓ Exact match (${currencySymbol}${total.toFixed(
+        2
+      )})</span>`;
+    } else if (diff > 0) {
+      summaryEl.innerHTML = `<span style="color: var(--accent-amber);">Remaining: ${currencySymbol}${diff.toFixed(
+        2
+      )}</span>`;
+    } else {
+      summaryEl.innerHTML = `<span style="color: var(--accent-rose);">Exceeds by ${currencySymbol}${Math.abs(
+        diff
+      ).toFixed(2)}</span>`;
+    }
+  }
+}
+
+/**
+ * Handle form submission to create a Split Bill
+ */
+async function handleCreateSplitBill(event) {
+  if (event) event.preventDefault();
+
+  if (!currentStudentId || currentStudentId <= 0) {
+    showToast("Auth Required", "Please log in first.", "error");
+    return;
+  }
+
+  const title = (document.getElementById("split-title") || {}).value.trim();
+  const totalAmount = parseFloat((document.getElementById("split-total-amount") || {}).value) || 0;
+  const groupIdVal = (document.getElementById("split-group-select") || {}).value;
+  const category = (document.getElementById("split-category") || {}).value || "Food";
+  const dateVal =
+    (document.getElementById("split-date") || {}).value || new Date().toISOString().split("T")[0];
+  const payerName = (document.getElementById("split-payer-select") || {}).value || "You";
+  const splitType = (document.getElementById("split-type") || {}).value || "EQUAL";
+  const syncExpense = !!(document.getElementById("split-sync-expense") || {}).checked;
+  const notes = (document.getElementById("split-notes") || {}).value.trim();
+  const submitBtn = document.getElementById("btn-submit-split-bill");
+
+  if (!title) {
+    showToast("Title Required", "Please enter a bill description.", "error");
+    return;
+  }
+
+  if (totalAmount <= 0) {
+    showToast("Invalid Amount", "Please enter a valid total amount.", "error");
+    return;
+  }
+
+  if (splitBillParticipants.length < 2) {
+    showToast("Add Friends", "Please add at least one friend to split this bill with.", "error");
+    return;
+  }
+
+  // If EXACT, validate shares sum
+  if (splitType === "EXACT") {
+    const sum = splitBillParticipants.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+    if (Math.abs(sum - totalAmount) > 0.05) {
+      showToast(
+        "Mismatch",
+        `The exact shares total (${currencySymbol}${sum.toFixed(
+          2
+        )}) must equal the total bill (${currencySymbol}${totalAmount.toFixed(2)}).`,
+        "error"
+      );
+      return;
+    }
+  }
+
+  const payload = {
+    student_id: currentStudentId,
+    group_id: groupIdVal ? parseInt(groupIdVal) : null,
+    title: title,
+    total_amount: totalAmount,
+    category: category,
+    date: dateVal,
+    payer_name: payerName,
+    split_type: splitType,
+    notes: notes || null,
+    sync_to_expenses: syncExpense,
+    shares: splitBillParticipants.map((p) => ({
+      member_name: p.name,
+      member_id: p.id || null,
+      share_amount: splitType === "EXACT" ? parseFloat(p.amount) || 0 : null,
+    })),
+  };
+
+  setButtonLoading(submitBtn, true, "Saving Split...");
+
+  try {
+    const res = await apiFetch(`${API_BASE}/api/split-bills/bills`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      closeModal("modal-split-bill");
+      showToast(
+        "Split Bill Saved!",
+        `Bill '${title}' split among ${splitBillParticipants.length} people.`,
+        "success"
+      );
+      loadSplitBillsView();
+      if (syncExpense) {
+        loadExpenses();
+        loadOverview();
+        loadBudgetAlerts();
+      }
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast("Error", err.detail || "Failed to create split bill.", "error");
+    }
+  } catch (e) {
+    console.error("Error creating split bill:", e);
+    showToast("Network Error", "Could not connect to server.", "error");
+  } finally {
+    setButtonLoading(submitBtn, false, "Save Split Bill");
+  }
+}
+
+/**
+ * Delete a Split Bill
+ */
+async function handleDeleteSplitBill(billId) {
+  if (
+    !confirm("Are you sure you want to delete this split bill? Any synced personal expense will also be removed.")
+  ) {
+    return;
+  }
+
+  try {
+    const res = await apiFetch(`${API_BASE}/api/split-bills/bills/${billId}?student_id=${currentStudentId}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok || res.status === 204) {
+      showToast("Split Bill Deleted", "The bill has been deleted.", "success");
+      loadSplitBillsView();
+      loadExpenses();
+      loadOverview();
+    } else {
+      showToast("Error", "Could not delete split bill.", "error");
+    }
+  } catch (e) {
+    console.error("Error deleting split bill:", e);
+    showToast("Network Error", "Could not connect to server.", "error");
+  }
+}
+
+/**
+ * Handle Create Split Group
+ */
+async function handleCreateGroup(event) {
+  if (event) event.preventDefault();
+
+  if (!currentStudentId || currentStudentId <= 0) {
+    showToast("Auth Required", "Please log in first.", "error");
+    return;
+  }
+
+  const nameInput = document.getElementById("group-name");
+  const descInput = document.getElementById("group-desc");
+  const submitBtn = document.getElementById("btn-submit-create-group");
+
+  const name = nameInput ? nameInput.value.trim() : "";
+  const desc = descInput ? descInput.value.trim() : "";
+
+  if (!name) {
+    showToast("Group Name Required", "Please enter a name for the group.", "error");
+    return;
+  }
+
+  // Gather initial members
+  const memberRows = document.querySelectorAll("#new-group-members-container .member-input-row");
+  const initialMembers = [];
+  memberRows.forEach((row) => {
+    const nameEl = row.querySelector(".new-member-name");
+    const upiEl = row.querySelector(".new-member-upi");
+    const mName = nameEl ? nameEl.value.trim() : "";
+    const mUpi = upiEl ? upiEl.value.trim() : "";
+    if (mName) {
+      initialMembers.push({
+        name: mName,
+        upi_id: mUpi || null,
+      });
+    }
+  });
+
+  const payload = {
+    student_id: currentStudentId,
+    name: name,
+    description: desc || null,
+    initial_members: initialMembers,
+  };
+
+  setButtonLoading(submitBtn, true, "Creating Group...");
+
+  try {
+    const res = await apiFetch(`${API_BASE}/api/split-bills/groups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      closeModal("modal-create-group");
+      const form = document.getElementById("form-create-group");
+      if (form) form.reset();
+      showToast("Group Created", `Group '${name}' created successfully.`, "success");
+      loadSplitBillsView();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast("Error", err.detail || "Failed to create group.", "error");
+    }
+  } catch (e) {
+    console.error("Error creating group:", e);
+    showToast("Network Error", "Could not connect to server.", "error");
+  } finally {
+    setButtonLoading(submitBtn, false, "Create Group");
+  }
+}
+
+/**
+ * Add another member input row in Create Group modal
+ */
+function addNewGroupMemberInput() {
+  const container = document.getElementById("new-group-members-container");
+  if (!container) return;
+
+  const div = document.createElement("div");
+  div.className = "member-input-row";
+  div.style.display = "flex";
+  div.style.gap = "0.5rem";
+  div.style.marginBottom = "0.5rem";
+  div.innerHTML = `
+    <input type="text" class="form-control new-member-name" placeholder="Friend's Full Name">
+    <input type="text" class="form-control new-member-upi" placeholder="UPI ID (optional)">
+    <button type="button" class="btn btn-ghost btn-xs text-rose" onclick="this.parentElement.remove()" title="Remove row">&times;</button>
+  `;
+  container.appendChild(div);
+}
+
+/**
+ * Open Modal to Record Settlement
+ */
+function openModalRecordSettlement(friendName, amount, direction, groupId, upiId) {
+  const friendNameInput = document.getElementById("settle-friend-name");
+  const groupIdInput = document.getElementById("settle-group-id");
+  const displayNameEl = document.getElementById("settle-display-name");
+  const displayAmountEl = document.getElementById("settle-display-amount");
+  const amountInput = document.getElementById("settle-amount");
+  const directionSelect = document.getElementById("settle-direction-select");
+  const directionText = document.getElementById("settle-direction-text");
+  const upiBox = document.getElementById("settle-upi-box");
+  const upiLink = document.getElementById("settle-upi-link");
+
+  const absAmount = Math.abs(amount || 0);
+
+  if (friendNameInput) friendNameInput.value = friendName;
+  if (groupIdInput) groupIdInput.value = groupId || "";
+  if (displayNameEl) displayNameEl.textContent = friendName;
+  if (displayAmountEl) displayAmountEl.textContent = `${currencySymbol}${absAmount.toFixed(2)}`;
+  if (amountInput) amountInput.value = absAmount.toFixed(2);
+  if (directionSelect) directionSelect.value = direction;
+
+  if (directionText) {
+    directionText.textContent =
+      direction === "THEY_PAID_YOU"
+        ? `Settling debt: ${friendName} owes you`
+        : `Settling debt: You owe ${friendName}`;
+  }
+
+  // Handle UPI link for paying friend
+  if (direction === "YOU_PAID_THEM" && upiId) {
+    if (upiBox) upiBox.style.display = "block";
+    if (upiLink) {
+      upiLink.href = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(friendName)}&am=${absAmount.toFixed(
+        2
+      )}&cu=INR`;
+    }
+  } else {
+    if (upiBox) upiBox.style.display = "none";
+  }
+
+  // Attach listener for direction change if not already attached
+  if (directionSelect) {
+    directionSelect.onchange = () => {
+      const dir = directionSelect.value;
+      if (directionText) {
+        directionText.textContent =
+          dir === "THEY_PAID_YOU"
+            ? `Settling debt: ${friendName} paid you`
+            : `Settling debt: You paid ${friendName}`;
+      }
+      if (dir === "THEY_PAID_YOU" && upiBox) {
+        upiBox.style.display = "none";
+      } else if (dir === "YOU_PAID_THEM" && upiId && upiBox) {
+        upiBox.style.display = "block";
+      }
+    };
+  }
+
+  openModal("modal-settle-up");
+}
+
+/**
+ * Handle Settlement Form Submission
+ */
+async function handleSettleUp(event) {
+  if (event) event.preventDefault();
+
+  if (!currentStudentId || currentStudentId <= 0) {
+    showToast("Auth Required", "Please log in first.", "error");
+    return;
+  }
+
+  const friendName = (document.getElementById("settle-friend-name") || {}).value;
+  const groupIdVal = (document.getElementById("settle-group-id") || {}).value;
+  const amountVal = parseFloat((document.getElementById("settle-amount") || {}).value) || 0;
+  const direction = (document.getElementById("settle-direction-select") || {}).value;
+  const method = (document.getElementById("settle-method") || {}).value || "UPI";
+  const notes = (document.getElementById("settle-notes") || {}).value.trim();
+
+  if (!friendName || amountVal <= 0) {
+    showToast("Invalid Amount", "Please enter a valid settlement amount.", "error");
+    return;
+  }
+
+  const fromName = direction === "THEY_PAID_YOU" ? friendName : "You";
+  const toName = direction === "THEY_PAID_YOU" ? "You" : friendName;
+
+  const payload = {
+    student_id: currentStudentId,
+    group_id: groupIdVal ? parseInt(groupIdVal) : null,
+    from_name: fromName,
+    to_name: toName,
+    amount: amountVal,
+    payment_method: method,
+    notes: notes || null,
+  };
+
+  try {
+    const res = await apiFetch(`${API_BASE}/api/split-bills/settle`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      closeModal("modal-settle-up");
+      showToast(
+        "Settlement Recorded",
+        `Recorded payment of ${currencySymbol}${amountVal.toFixed(2)} between You and ${friendName}.`,
+        "success"
+      );
+      loadSplitBillsView();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast("Error", err.detail || "Failed to record settlement.", "error");
+    }
+  } catch (e) {
+    console.error("Error recording settlement:", e);
+    showToast("Network Error", "Could not connect to server.", "error");
+  }
+}
+
+/**
+ * Delete a recorded settlement
+ */
+async function handleDeleteSettlement(settlementId) {
+  if (!confirm("Are you sure you want to delete this settlement record?")) return;
+
+  try {
+    const res = await apiFetch(
+      `${API_BASE}/api/split-bills/settlements/${settlementId}?student_id=${currentStudentId}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (res.ok || res.status === 204) {
+      showToast("Settlement Deleted", "The settlement record has been removed.", "success");
+      loadSplitBillsView();
+    } else {
+      showToast("Error", "Could not delete settlement.", "error");
+    }
+  } catch (e) {
+    console.error("Error deleting settlement:", e);
+    showToast("Network Error", "Could not connect to server.", "error");
+  }
+}
+
+/**
+ * Open WhatsApp Reminder Modal
+ */
+function openWhatsAppModal(friendName, amount, encodedMsg) {
+  const textEl = document.getElementById("wa-reminder-text");
+  const msg = encodedMsg
+    ? decodeURIComponent(encodedMsg)
+    : `Hey ${friendName}, you have a pending split of ${currencySymbol}${amount.toFixed(
+        2
+      )} for shared expenses on SmartFinance. Please settle when you get a chance!`;
+
+  currentWhatsAppReminderText = msg;
+  if (textEl) textEl.value = msg;
+
+  openModal("modal-whatsapp-reminder");
+}
+
+/**
+ * Copy pre-formatted WhatsApp message to clipboard
+ */
+function copyWhatsAppMessage() {
+  const textEl = document.getElementById("wa-reminder-text");
+  const text = textEl ? textEl.value : currentWhatsAppReminderText;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        showToast("Copied!", "Message copied to clipboard.", "success");
+      })
+      .catch(() => {
+        fallbackCopy(text);
+      });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  document.body.appendChild(textArea);
+  textArea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textArea);
+  showToast("Copied!", "Message copied to clipboard.", "success");
+}
+
+/**
+ * Open WhatsApp chat / Web with pre-filled message
+ */
+function openWhatsAppChat() {
+  const textEl = document.getElementById("wa-reminder-text");
+  const text = textEl ? textEl.value : currentWhatsAppReminderText;
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  window.open(url, "_blank");
+}
+
 // Global Window Exports for Inline HTML Event Attributes
 window.switchTab = switchTab;
 window.switchAuthTab = switchAuthTab;
@@ -1588,3 +2736,32 @@ window.openModal = openModal;
 window.closeModal = closeModal;
 window.handleLoginStudent = handleLoginStudent;
 window.handleRegisterStudent = handleRegisterStudent;
+
+// Split Bills Window Exports
+window.loadSplitBillsView = loadSplitBillsView;
+window.loadSplitBalances = loadSplitBalances;
+window.loadSplitGroups = loadSplitGroups;
+window.loadSplitBillsList = loadSplitBillsList;
+window.loadSplitSettlements = loadSplitSettlements;
+window.filterSplitGroup = filterSplitGroup;
+window.switchSplitSubtab = switchSplitSubtab;
+window.openModalSplitBill = openModalSplitBill;
+window.onSplitGroupSelected = onSplitGroupSelected;
+window.updatePayerSelect = updatePayerSelect;
+window.setSplitType = setSplitType;
+window.renderSplitParticipantsList = renderSplitParticipantsList;
+window.onParticipantExactAmountChange = onParticipantExactAmountChange;
+window.addQuickParticipant = addQuickParticipant;
+window.removeParticipant = removeParticipant;
+window.recalculateSplitShares = recalculateSplitShares;
+window.handleCreateSplitBill = handleCreateSplitBill;
+window.handleDeleteSplitBill = handleDeleteSplitBill;
+window.handleCreateGroup = handleCreateGroup;
+window.addNewGroupMemberInput = addNewGroupMemberInput;
+window.openModalRecordSettlement = openModalRecordSettlement;
+window.handleSettleUp = handleSettleUp;
+window.handleDeleteSettlement = handleDeleteSettlement;
+window.openWhatsAppModal = openWhatsAppModal;
+window.copyWhatsAppMessage = copyWhatsAppMessage;
+window.openWhatsAppChat = openWhatsAppChat;
+

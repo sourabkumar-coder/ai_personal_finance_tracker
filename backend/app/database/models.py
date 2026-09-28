@@ -40,6 +40,7 @@ class Student(Base):
     recommendations = relationship("Recommendation", back_populates="student", cascade="all, delete-orphan")
     category_preferences = relationship("CategoryPreference", back_populates="student", cascade="all, delete-orphan")
     settings = relationship("StudentSettings", back_populates="student", uselist=False, cascade="all, delete-orphan")
+    split_groups = relationship("SplitGroup", back_populates="student", cascade="all, delete-orphan")
 
 
 class Expense(Base):
@@ -64,6 +65,7 @@ class Expense(Base):
     confidence = Column(Float, default=1.0, nullable=False)
     is_automatically_detected = Column(Boolean, default=False, nullable=False)
     fingerprint = Column(String(64), unique=True, nullable=True, index=True)
+    split_bill_id = Column(Integer, ForeignKey("split_bills.id", ondelete="SET NULL", use_alter=True), nullable=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
@@ -176,4 +178,90 @@ class StudentSettings(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     student = relationship("Student", back_populates="settings")
+
+
+class SplitGroup(Base):
+    __tablename__ = "split_groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False, index=True)
+    name = Column(String(150), nullable=False)
+    description = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+
+    student = relationship("Student", back_populates="split_groups")
+    members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
+    bills = relationship("SplitBill", back_populates="group", cascade="all, delete-orphan")
+    settlements = relationship("SplitSettlement", back_populates="group", cascade="all, delete-orphan")
+
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("split_groups.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    email = Column(String(150), nullable=True)
+    upi_id = Column(String(100), nullable=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+
+    group = relationship("SplitGroup", back_populates="members")
+    shares = relationship("SplitBillShare", back_populates="member", cascade="all, delete-orphan")
+
+
+class SplitBill(Base):
+    __tablename__ = "split_bills"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False, index=True)
+    group_id = Column(Integer, ForeignKey("split_groups.id"), nullable=True, index=True)
+    title = Column(String(200), nullable=False)
+    total_amount = Column(Float, nullable=False)
+    category = Column(String(100), default="Food", nullable=False)
+    date = Column(Date, default=date.today, nullable=False)
+    payer_name = Column(String(100), default="You", nullable=False)
+    payer_member_id = Column(Integer, ForeignKey("group_members.id"), nullable=True)
+    split_type = Column(String(20), default="EQUAL", nullable=False)  # EQUAL, EXACT
+    notes = Column(Text, nullable=True)
+    synced_expense_id = Column(Integer, ForeignKey("expenses.id", ondelete="SET NULL", use_alter=True), nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+
+    student = relationship("Student")
+    group = relationship("SplitGroup", back_populates="bills")
+    shares = relationship("SplitBillShare", back_populates="bill", cascade="all, delete-orphan")
+    synced_expense = relationship("Expense", foreign_keys=[synced_expense_id])
+
+
+class SplitBillShare(Base):
+    __tablename__ = "split_bill_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bill_id = Column(Integer, ForeignKey("split_bills.id"), nullable=False, index=True)
+    member_id = Column(Integer, ForeignKey("group_members.id"), nullable=True, index=True)
+    member_name = Column(String(100), nullable=False)
+    share_amount = Column(Float, nullable=False)
+    is_settled = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
+
+    bill = relationship("SplitBill", back_populates="shares")
+    member = relationship("GroupMember", back_populates="shares")
+
+
+class SplitSettlement(Base):
+    __tablename__ = "split_settlements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False, index=True)
+    group_id = Column(Integer, ForeignKey("split_groups.id"), nullable=True, index=True)
+    from_name = Column(String(100), nullable=False)
+    to_name = Column(String(100), nullable=False)
+    amount = Column(Float, nullable=False)
+    payment_method = Column(String(50), default="UPI", nullable=False)
+    settlement_date = Column(Date, default=date.today, nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+
+    student = relationship("Student")
+    group = relationship("SplitGroup", back_populates="settlements")
 
