@@ -21,7 +21,7 @@ const Onboarding = () => {
     password: '',
     monthly_allowance: '',
     currency: 'USD',
-    college_year: 'Sophomore',
+    college_year: 'First Year',
   });
 
   const [loginEmail, setLoginEmail] = useState('');
@@ -275,11 +275,11 @@ const Onboarding = () => {
                 onChange={handleChange} 
                 className="input-field"
               >
-                <option value="Freshman">Freshman (1st Year)</option>
-                <option value="Sophomore">Sophomore (2nd Year)</option>
-                <option value="Junior">Junior (3rd Year)</option>
-                <option value="Senior">Senior (4th Year)</option>
-                <option value="Graduate">Graduate Student</option>
+                <option value="First Year">First Year</option>
+                <option value="2nd Year">2nd Year</option>
+                <option value="3rd Year">3rd Year</option>
+                <option value="4th Year">4th Year</option>
+                <option value="Graduate">Graduate</option>
               </select>
             </div>
 

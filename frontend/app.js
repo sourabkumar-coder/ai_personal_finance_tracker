@@ -233,7 +233,7 @@ async function handleRegisterStudent(event) {
   const email = emailInput ? emailInput.value.trim() : "";
   const password = passwordInput ? passwordInput.value : "";
   const allowance = allowanceInput ? parseFloat(allowanceInput.value) : 0;
-  const year = yearInput ? yearInput.value : "Freshman";
+  const year = yearInput ? yearInput.value : "First Year";
 
   if (!name || !email || !password || !allowance) {
     showAuthAlert("Please fill in all required fields.", "error");
@@ -1469,7 +1469,7 @@ async function createDefaultStudent() {
         email: "aryan@campus.edu",
         monthly_allowance: 12000.0,
         currency: "INR",
-        college_year: "Sophomore",
+        college_year: "First Year",
       }),
     });
     if (res.ok) {

@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Any
+from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
@@ -104,6 +104,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 
 @router.get("/me", response_model=StudentResponse)
-def get_current_user_info(current_student: Student = Depends(get_current_student)) -> Any:
+def get_current_user_info(current_student: Optional[Student] = Depends(get_current_student)) -> Any:
     """Get current student profile."""
+    if not current_student:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return current_student
