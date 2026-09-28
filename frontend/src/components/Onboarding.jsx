@@ -94,7 +94,7 @@ const Onboarding = () => {
       </div>
 
       {/* Main Authentication Card */}
-      <div className="card" style={{ width: '100%', maxWidth: '460px', padding: '2rem', borderRadius: 'var(--radius-xl)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+      <div className="card auth-card" style={{ width: '100%', borderRadius: 'var(--radius-xl)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
         
         {/* Sandbox Demo Callout */}
         <div style={{ padding: '0.875rem 1rem', background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)', border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
