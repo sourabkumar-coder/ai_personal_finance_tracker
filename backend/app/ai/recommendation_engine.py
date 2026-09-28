@@ -24,7 +24,7 @@ class RecommendationEngine:
     Intelligent recommendation engine analyzing student spending habits,
     budget boundaries, and goal targets.
     
-    Uses Google Gemini Generative AI when GEMINI_API_KEY is configured,
+    Uses Groq Generative AI when GROQ_API_KEY is configured,
     with seamless fallback to internal heuristic rules.
     """
 
@@ -37,22 +37,17 @@ class RecommendationEngine:
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         groq_env = os.environ.get("GROQ_API_KEY") or getattr(settings, "groq_api_key", "")
-        gemini_env = os.environ.get("GEMINI_API_KEY") or getattr(settings, "gemini_api_key", "")
 
-        # If test monkeypatched GEMINI_API_KEY or GROQ_API_KEY to empty or invalid, skip live AI calls to test rule-based fallbacks
-        if gemini_env == "" or groq_env == "" or (gemini_env and "invalid" in str(gemini_env).lower()) or (groq_env and "invalid" in str(groq_env).lower()):
+        # If test monkeypatched GROQ_API_KEY to empty or invalid, skip live AI calls to test rule-based fallbacks
+        if groq_env == "" or (groq_env and "invalid" in str(groq_env).lower()):
             active_groq_key = None
-            active_gemini_key = None
         else:
-            active_groq_key = groq_env if (groq_env and groq_env.strip().startswith("gsk_")) else (gemini_env if (gemini_env and gemini_env.strip().startswith("gsk_")) else None)
-            if active_groq_key and "invalid" in active_groq_key.lower():
-                active_groq_key = None
-            active_gemini_key = gemini_env if (gemini_env and gemini_env.strip() and not gemini_env.strip().startswith("gsk_") and gemini_env.strip() != "your_gemini_api_key_here") else None
+            active_groq_key = groq_env.strip() if groq_env and groq_env.strip() else None
 
         if active_groq_key:
             try:
                 groq_recs = cls._generate_groq_recommendations(
-                    api_key=active_groq_key.strip(),
+                    api_key=active_groq_key,
                     student_data=student_data,
                     expenses=expenses,
                     budgets=budgets,
@@ -62,20 +57,6 @@ class RecommendationEngine:
                     return groq_recs
             except Exception as e:
                 logger.warning(f"Groq API recommendation error: {e}. Falling back to rule-based engine.")
-
-        if active_gemini_key:
-            try:
-                gemini_recs = cls._generate_gemini_recommendations(
-                    api_key=active_gemini_key.strip(),
-                    student_data=student_data,
-                    expenses=expenses,
-                    budgets=budgets,
-                    goals=goals,
-                )
-                if gemini_recs and len(gemini_recs) > 0:
-                    return gemini_recs
-            except Exception as e:
-                logger.warning(f"Gemini API recommendation error: {e}. Falling back to rule-based engine.")
 
         # Fallback to heuristic rule engine
         return cls._generate_rule_based_recommendations(
@@ -201,149 +182,6 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
             except Exception as e:
                 logger.warning(f"Error invoking Groq model {model}: {e}")
                 continue
-
-        return []
-
-    @classmethod
-    def _generate_gemini_recommendations(
-        cls,
-        api_key: str,
-        student_data: Dict[str, Any],
-        expenses: List[Dict[str, Any]],
-        budgets: List[Dict[str, Any]],
-        goals: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
-        configured_model = getattr(settings, "gemini_model", "gemini-2.0-flash") or "gemini-2.0-flash"
-        if configured_model == "gemini-2.5-flash":
-            configured_model = "gemini-2.0-flash"
-
-        candidate_models = [configured_model, "gemini-2.0-flash", "gemini-1.5-flash"]
-        models_to_try = list(dict.fromkeys(candidate_models))
-
-        allowance = float(student_data.get("monthly_allowance") or 0.0)
-        currency = str(student_data.get("currency") or "INR")
-        student_name = str(student_data.get("name") or "Student")
-        total_spent = sum(float(e.get("amount") or 0.0) for e in expenses)
-
-        # Build financial summary for prompt
-        financial_context = {
-            "student_name": student_name,
-            "monthly_allowance": f"{currency} {allowance:,.2f}",
-            "total_spent_this_month": f"{currency} {total_spent:,.2f}",
-            "remaining_balance": f"{currency} {max(0.0, allowance - total_spent):,.2f}",
-            "expenses_summary": [
-                {
-                    "category": str(e.get("category") or "General"),
-                    "amount": float(e.get("amount") or 0.0),
-                    "title": str(e.get("title") or ""),
-                    "date": str(e.get("date") or ""),
-                }
-                for e in expenses[-15:]  # last 15 expenses
-            ],
-            "category_budgets": [
-                {
-                    "category": str(b.get("category") or ""),
-                    "monthly_limit": float(b.get("monthly_limit") or 0.0),
-                }
-                for b in budgets
-            ],
-            "savings_goals": [
-                {
-                    "title": str(g.get("title") or ""),
-                    "target_amount": float(g.get("target_amount") or 0.0),
-                    "current_amount": float(g.get("current_amount") or 0.0),
-                    "status": str(g.get("status") or "In Progress"),
-                }
-                for g in goals
-            ],
-        }
-
-        prompt = f"""
-You are an expert AI financial advisor dedicated to college students and young adults.
-Analyze this student's real financial status and generate 3 to 5 highly personalized, encouraging, and actionable financial recommendations:
-
-Financial Data:
-{json.dumps(financial_context, indent=2)}
-
-Return ONLY a JSON array containing recommendation objects with this exact schema:
-[
-  {{
-    "title": "Short title with emoji (under 50 chars)",
-    "message": "Specific, practical, empathetic advice (1-3 sentences)",
-    "category": "e.g. Food, Books, Overall Budget, Savings, Entertainment",
-    "impact_level": "Low", "Medium", or "High"
-  }}
-]
-"""
-
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "temperature": 0.4,
-            },
-        }
-
-        for model in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-            try:
-                with httpx.Client(timeout=12.0) as client:
-                    resp = client.post(url, json=payload)
-                    if resp.status_code != 200:
-                        logger.warning(f"Gemini API ({model}) returned status code {resp.status_code}: {resp.text[:200]}")
-                        continue
-
-                    data = resp.json()
-                    candidates = data.get("candidates", [])
-                    if not candidates:
-                        continue
-
-                    content_text = candidates[0]["content"]["parts"][0]["text"]
-                    parsed_recs = json.loads(content_text)
-
-                    clean_recs = []
-                    if isinstance(parsed_recs, list):
-                        for item in parsed_recs:
-                            if isinstance(item, dict) and "title" in item and "message" in item:
-                                clean_recs.append({
-                                    "title": str(item.get("title") or "Financial Insight")[:200],
-                                    "message": str(item.get("message") or ""),
-                                    "category": str(item.get("category") or "General")[:100],
-                                    "impact_level": str(item.get("impact_level") or "Medium").capitalize()
-                                    if str(item.get("impact_level") or "").lower() in ["low", "medium", "high"]
-                                    else "Medium",
-                                })
-                    if clean_recs:
-                        return clean_recs
-            except Exception as e:
-                logger.warning(f"Error invoking Gemini model {model}: {e}")
-                continue
-
-        return []
-
-    @classmethod
-    def generate_gemini_recommendations(
-        cls,
-        student_data: Dict[str, Any],
-        expenses: List[Dict[str, Any]],
-        budgets: List[Dict[str, Any]],
-        goals: List[Dict[str, Any]],
-        api_key: Optional[str] = None,
-    ) -> Optional[List[Dict[str, Any]]]:
-        if not api_key:
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key and settings and hasattr(settings, "gemini_api_key"):
-                api_key = settings.gemini_api_key
-        if not api_key or api_key == "your_gemini_api_key_here":
-            return None
-        recs = cls._generate_gemini_recommendations(
-            api_key=api_key,
-            student_data=student_data,
-            expenses=expenses,
-            budgets=budgets,
-            goals=goals,
-        )
-        return recs if recs else None
 
     @classmethod
     def _generate_rule_based_recommendations(

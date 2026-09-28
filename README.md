@@ -1,6 +1,6 @@
 # AI Personal Finance Tracker with Automatic UPI/Bank Detection 💰⚡🎓
 
-An intelligent, student-centric personal finance tracker that eliminates manual expense entry through **Zero-Friction UPI & Bank Transaction Detection**, **3-Tier AI Categorization**, real-time budget tracking, savings goal management, and Gemini-powered financial recommendations.
+An intelligent, student-centric personal finance tracker that eliminates manual expense entry through **Zero-Friction UPI & Bank Transaction Detection**, **3-Tier AI Categorization**, real-time budget tracking, savings goal management, and Groq-powered financial recommendations.
 
 ---
 
@@ -52,7 +52,7 @@ Because students make multiple micro-transactions daily (chai, snacks, metro, xe
 │                    3-Tier AI Categorizer Engine                        │
 │   Tier 1: Student Category Preference Override (Confidence: 1.0)       │
 │   Tier 2: Heuristics Dictionary (150+ Indian Merchants, Conf: 0.95)   │
-│   Tier 3: Google Gemini 2.5 Flash API (Contextual Fallback)            │
+│   Tier 3: Groq Generative AI API (Contextual Fallback)                 │
 │                                  │                                     │
 │                   SQLAlchemy ORM & Local SQLite DB                     │
 │                   - Stores expense with auto-detect metadata           │
@@ -103,7 +103,7 @@ ai_personal_finance_tracker/
 │   │   ├── main.py                             # FastAPI entrypoint
 │   │   ├── ai/
 │   │   │   ├── recommendation_engine.py        # Budget & savings heuristics
-│   │   │   ├── transaction_categorizer.py      # 3-Tier AI categorizer (Gemini Flash)
+│   │   │   ├── transaction_categorizer.py      # 3-Tier AI categorizer (Groq AI)
 │   │   │   └── transaction_parser.py           # Server-side regex extraction
 │   │   ├── database/
 │   │   │   ├── database.py                     # SQLAlchemy session manager
@@ -125,7 +125,7 @@ ai_personal_finance_tracker/
 │   │   │   └── recommendation_service.py       # Recommendation workflow
 │   │   └── utils/helpers.py                    # Date & currency formatting
 │   ├── requirements.txt                        # Python backend dependencies
-│   └── .env                                    # Environment config (GEMINI_API_KEY)
+│   └── .env                                    # Environment config (GROQ_API_KEY)
 │
 ├── frontend/                                   # Web Dashboard (Primary Interface)
 │   ├── index.html                              # Dashboard, auto-tracking banner & simulator modal
@@ -160,8 +160,8 @@ Every detected transaction is categorized using a fail-safe, hierarchical intell
    - Checks if the user previously confirmed or re-categorized a merchant (e.g., if a student changes *Amazon* from *Shopping* to *Education*, future Amazon transactions inherit *Education* automatically).
 2. **Tier 2: Student Merchant Heuristic Dictionary** (Confidence: `0.95`)
    - 150+ high-frequency Indian student brands and merchants pre-mapped (Swiggy, Zomato, Zepto, Blinkit, Chai Point, IRCTC, Uber, Ola, Rapido, Campus Canteen, Xerox, Netflix, Spotify, Amazon, Flipkart, etc.).
-3. **Tier 3: Google Gemini 2.5 Flash Fallback** (Confidence: `0.80 - 0.90`)
-   - For unmapped merchants (e.g., local VPAs like `sharma_provisions@okaxis`), calls Gemini 2.5 Flash to deduce category based on name keywords and transaction context.
+3. **Tier 3: Groq Generative AI Fallback** (Confidence: `0.80 - 0.90`)
+   - For unmapped merchants (e.g., local VPAs like `sharma_provisions@okaxis`), calls Groq AI to deduce category based on name keywords and transaction context.
 
 ### 2. Strict Deduplication & Double-Count Prevention
 - **SHA-256 Unique Fingerprinting**: Derived from UPI Reference ID (UTR) or a composite key of `(student_id, amount, merchant, date)`.
@@ -216,7 +216,7 @@ Every detected transaction is categorized using a fail-safe, hierarchical intell
 4. **Configure environment variables:**
    ```bash
    cp .env.example .env
-   # Open .env and insert your GEMINI_API_KEY (optional, fallback heuristics work offline)
+   # Open .env and insert your GROQ_API_KEY (optional, fallback heuristics work offline)
    ```
 
 5. **Start the FastAPI server:**

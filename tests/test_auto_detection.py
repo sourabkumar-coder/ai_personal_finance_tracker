@@ -98,7 +98,7 @@ def test_case_8_unknown_notification_no_fake_transaction():
 
 def test_api_auto_detect_valid_payment(client, student_id, monkeypatch):
     """End-to-end API test: simulate valid notification and verify expense created."""
-    monkeypatch.setattr(settings, "gemini_api_key", "")
+    monkeypatch.setattr(settings, "groq_api_key", "")
     res = client.post(
         "/api/transactions/simulate-notification",
         json={
@@ -120,7 +120,7 @@ def test_api_auto_detect_valid_payment(client, student_id, monkeypatch):
 
 def test_case_7_duplicate_prevention(client, student_id, monkeypatch):
     """Case 7: Two identical payment notifications -> Exactly ONE transaction saved."""
-    monkeypatch.setattr(settings, "gemini_api_key", "")
+    monkeypatch.setattr(settings, "groq_api_key", "")
     payload = {
         "student_id": student_id,
         "notification_text": "Paid ₹220 to Uber via UPI Ref 987654321012",
@@ -172,7 +172,7 @@ def test_personalized_ai_learning(client, student_id, monkeypatch):
     Section 14: User corrections (e.g. Amazon -> Education) must be saved
     and applied to future transactions.
     """
-    monkeypatch.setattr(settings, "gemini_api_key", "")
+    monkeypatch.setattr(settings, "groq_api_key", "")
 
     # 1. First transaction: Amazon defaults to Shopping
     res1 = client.post(

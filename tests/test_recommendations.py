@@ -4,9 +4,7 @@ from app.config import settings
 
 
 def test_recommendation_and_forecast_flow(client, monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "")
     monkeypatch.setattr(settings, "groq_api_key", "")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     # Register student
@@ -124,10 +122,8 @@ def test_rule_based_recommendations_budget_exceeded():
     assert any("Budget Exceeded in Food" in r["title"] for r in recs)
 
 
-def test_gemini_fallback_when_api_key_empty(monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "")
+def test_groq_fallback_when_api_key_empty(monkeypatch):
     monkeypatch.setattr(settings, "groq_api_key", "")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     student = {"id": 1, "name": "Student", "monthly_allowance": 500.0}
     expenses = [{"amount": 100.0, "category": "General"}]
@@ -141,10 +137,8 @@ def test_gemini_fallback_when_api_key_empty(monkeypatch):
     assert "message" in recs[0]
 
 
-def test_gemini_fallback_on_network_error(monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "invalid_test_key")
+def test_groq_fallback_on_network_error(monkeypatch):
     monkeypatch.setattr(settings, "groq_api_key", "invalid_test_key")
-    monkeypatch.setenv("GEMINI_API_KEY", "invalid_test_key")
     monkeypatch.setenv("GROQ_API_KEY", "invalid_test_key")
     student = {"id": 1, "name": "Student", "monthly_allowance": 500.0}
     expenses = [{"amount": 450.0, "category": "Food"}]
@@ -159,9 +153,7 @@ def test_gemini_fallback_on_network_error(monkeypatch):
 
 
 def test_recommendations_api_flow(client, monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "")
     monkeypatch.setattr(settings, "groq_api_key", "")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     # 1. Register student

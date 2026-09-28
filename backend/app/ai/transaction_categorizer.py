@@ -3,7 +3,7 @@ AI Expense Categorization Engine with Personalized Feedback Learning.
 Implements a 3-tier categorization hierarchy:
 1. User-Learned Preferences (Highest Priority - Personalized)
 2. Comprehensive Rule-Based Heuristic Dictionary (Fast, Deterministic)
-3. Google Gemini Generative AI Classification (Flexible, Handles Novel Merchants)
+3. Groq Generative AI Classification (Flexible, Handles Novel Merchants)
 """
 import os
 import json
@@ -184,7 +184,7 @@ HEURISTIC_RULES: Dict[str, Tuple[str, str]] = {
 class TransactionCategorizer:
     """
     Intelligent categorizer evaluating user preferences, deterministic dictionaries,
-    and Gemini AI to classify financial expenses.
+    and Groq AI to classify financial expenses.
     """
 
     @classmethod
@@ -202,7 +202,7 @@ class TransactionCategorizer:
             "category": str,
             "subcategory": Optional[str],
             "confidence": float,  # 0.0 to 1.0
-            "method": "user_preference" | "heuristic" | "gemini_ai" | "fallback"
+            "method": "user_preference" | "heuristic" | "groq_ai" | "fallback"
         }
         """
         normalized_merchant = (merchant or "").strip().lower()
@@ -240,32 +240,23 @@ class TransactionCategorizer:
             }
 
         # -------------------------------------------------------------
-        # Tier 3: Groq / Gemini Generative AI (if API key configured)
+        # Tier 3: Groq Generative AI (if API key configured)
         # -------------------------------------------------------------
         groq_key = os.getenv("GROQ_API_KEY") or (settings.groq_api_key if settings and hasattr(settings, "groq_api_key") else "")
-        gemini_key = os.getenv("GEMINI_API_KEY") or (settings.gemini_api_key if settings and hasattr(settings, "gemini_api_key") else "")
-        api_key = groq_key or gemini_key
+        api_key = groq_key.strip() if groq_key else ""
 
-        if api_key and api_key.strip() and api_key.strip() != "your_gemini_api_key_here":
+        if api_key and "invalid" not in api_key.lower():
             try:
-                if api_key.strip().startswith("gsk_"):
-                    ai_result = cls._categorize_with_groq(
-                        api_key=api_key.strip(),
-                        merchant=merchant,
-                        amount=amount,
-                        description=description,
-                    )
-                else:
-                    ai_result = cls._categorize_with_gemini(
-                        api_key=api_key.strip(),
-                        merchant=merchant,
-                        amount=amount,
-                        description=description,
-                    )
+                ai_result = cls._categorize_with_groq(
+                    api_key=api_key,
+                    merchant=merchant,
+                    amount=amount,
+                    description=description,
+                )
                 if ai_result:
                     return ai_result
             except Exception as e:
-                logger.warning(f"AI categorization failed: {e}. Defaulting to fallback category.")
+                logger.warning(f"Groq AI categorization failed: {e}. Defaulting to fallback category.")
 
         # -------------------------------------------------------------
         # Fallback: General / Other
@@ -287,70 +278,6 @@ class TransactionCategorizer:
         return None
 
     @classmethod
-    def _categorize_with_gemini(
-        cls,
-        api_key: str,
-        merchant: str,
-        amount: float,
-        description: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """Use Gemini 2.5 Flash to categorize unseen merchants."""
-        model = getattr(settings, "gemini_model", "gemini-2.5-flash") or "gemini-2.5-flash"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-
-        prompt = f"""
-You are a financial classification AI for a student finance tracker.
-Classify this financial expense into ONE of these allowed categories:
-{json.dumps(CATEGORIES)}
-
-Transaction Details:
-- Merchant/Party: {merchant}
-- Amount: ₹{amount:.2f}
-- Details: {description or 'N/A'}
-
-Return strictly a JSON object with this exact schema:
-{{
-  "category": "One of allowed categories",
-  "subcategory": "Specific subcategory e.g. Dining, Textbooks, Metro",
-  "confidence": 0.85
-}}
-"""
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "temperature": 0.2,
-            },
-        }
-
-        with httpx.Client(timeout=8.0) as client:
-            resp = client.post(url, json=payload)
-            if resp.status_code != 200:
-                return None
-
-            data = resp.json()
-            candidates = data.get("candidates", [])
-            if not candidates:
-                return None
-
-            content_text = candidates[0]["content"]["parts"][0]["text"]
-            parsed = json.loads(content_text)
-            cat = str(parsed.get("category") or "Other").strip()
-            if cat not in CATEGORIES:
-                cat = "Other"
-
-            subcat = str(parsed.get("subcategory") or "General").strip()
-            confidence = float(parsed.get("confidence") or 0.80)
-            confidence = max(0.10, min(1.0, confidence))
-
-            return {
-                "category": cat,
-                "subcategory": subcat,
-                "confidence": round(confidence, 2),
-                "method": "gemini_ai",
-            }
-
-    @classmethod
     def _categorize_with_groq(
         cls,
         api_key: str,
@@ -358,7 +285,7 @@ Return strictly a JSON object with this exact schema:
         amount: float,
         description: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Use Groq Llama3 to categorize unseen merchants."""
+        """Use Groq Llama3/GPT models to categorize unseen merchants."""
         model = getattr(settings, "groq_model", "openai/gpt-oss-20b") or "openai/gpt-oss-20b"
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
@@ -420,3 +347,4 @@ Return strictly a JSON object with this exact schema:
         except Exception as e:
             logger.warning(f"Groq categorization error: {e}")
             return None
+None

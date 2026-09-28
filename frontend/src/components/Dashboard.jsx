@@ -491,7 +491,7 @@ const Dashboard = () => {
           <div className="brand-meta">
             <h2>SmartFinance</h2>
             <span className="brand-badge">
-              <Sparkles size={10} /> Gemini AI Powered
+              <Sparkles size={10} /> Groq AI Powered
             </span>
           </div>
         </div>
@@ -632,7 +632,7 @@ const Dashboard = () => {
           <div className="header-actions">
             <div className="ai-status-pill">
               <span className="status-dot"></span>
-              <span>Gemini Engine Ready</span>
+              <span>Groq Engine Ready</span>
             </div>
 
             <button
@@ -1490,7 +1490,7 @@ const Dashboard = () => {
                     <Sparkles size={20} className="text-primary" /> AI Financial Advisor & Habits Engine
                   </h2>
                   <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                    Continuous analysis powered by Google Gemini heuristics to optimize your student budget.
+                    Continuous analysis powered by Groq AI heuristics to optimize your student budget.
                   </p>
                 </div>
 

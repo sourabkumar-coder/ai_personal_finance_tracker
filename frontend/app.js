@@ -542,7 +542,7 @@ function switchTab(tabId) {
   const headingMap = {
     overview: "Financial Overview",
     trends: "Expense Trends",
-    "ai-advisor": "Gemini AI Financial Advisor",
+    "ai-advisor": "Groq AI Financial Advisor",
     expenses: "Itemized Expenses",
     budgets: "Monthly Budgets",
     goals: "Financial Savings Goals",
@@ -1125,7 +1125,7 @@ async function triggerGenerateRecommendations() {
   if (!currentStudentId) return;
   const btnText = document.getElementById("ai-generate-text");
   const btnIcon = document.getElementById("ai-generate-icon");
-  if (btnText) btnText.textContent = "Analyzing Habits with Gemini...";
+  if (btnText) btnText.textContent = "Analyzing Habits with Groq AI...";
   if (btnIcon) btnIcon.textContent = "";
 
   try {
