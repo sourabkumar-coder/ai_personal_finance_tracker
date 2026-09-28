@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import {
   ResponsiveContainer,
   PieChart,
@@ -37,6 +38,7 @@ import {
   PiggyBank,
   ShieldCheck,
   Clock,
+  Menu,
 } from 'lucide-react';
 
 const CHART_COLORS = [
@@ -64,16 +66,23 @@ const CATEGORY_ICONS = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const studentId = localStorage.getItem('student_id');
   const toastIdRef = useRef(0);
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState('overview'); // overview, expenses, budgets, goals, trends, advisor
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+
+  // Switch tab and close the mobile drawer
+  const goTab = (tab) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+  };
 
   // Global loading
   const [loading, setLoading] = useState(true);
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [demoSeeding, setDemoSeeding] = useState(false);
 
   // App Data
   const [profile, setProfile] = useState(null);
@@ -140,9 +149,9 @@ const Dashboard = () => {
   const [recFilterImpact, setRecFilterImpact] = useState('ALL'); // ALL, High, Medium, Low
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('student_id');
+    logout();
     navigate('/onboarding');
-  }, [navigate]);
+  }, [navigate, logout]);
 
   // Main Data Fetcher
   const fetchAllData = useCallback(async () => {
@@ -211,21 +220,6 @@ const Dashboard = () => {
       isCancelled = true;
     };
   }, [studentId, navigate, fetchAllData]);
-
-  // 1-Click Seed Demo
-  const handleSeedDemo = async () => {
-    setDemoSeeding(true);
-    try {
-      const demo = await api.seedDemo();
-      localStorage.setItem('student_id', demo.id);
-      addToast('Demo account (Alex Rivera) refreshed with live data!');
-      await fetchAllData();
-    } catch (err) {
-      addToast('Failed to seed demo: ' + err.message, 'error');
-    } finally {
-      setDemoSeeding(false);
-    }
-  };
 
   // Add Expense
   const handleAddExpense = async (e) => {
@@ -485,7 +479,14 @@ const Dashboard = () => {
       </div>
 
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      {sidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="brand-section">
           <div className="brand-logo-icon">💎</div>
           <div className="brand-meta">
@@ -502,7 +503,7 @@ const Dashboard = () => {
           <button
             type="button"
             className={`sidebar-btn ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('overview')}
+            onClick={() => goTab('overview')}
           >
             <div className="sidebar-btn-content">
               <BarChart3 size={18} />
@@ -514,7 +515,7 @@ const Dashboard = () => {
           <button
             type="button"
             className={`sidebar-btn ${activeTab === 'expenses' ? 'active' : ''}`}
-            onClick={() => setActiveTab('expenses')}
+            onClick={() => goTab('expenses')}
           >
             <div className="sidebar-btn-content">
               <CreditCard size={18} />
@@ -528,7 +529,7 @@ const Dashboard = () => {
           <button
             type="button"
             className={`sidebar-btn ${activeTab === 'budgets' ? 'active' : ''}`}
-            onClick={() => setActiveTab('budgets')}
+            onClick={() => goTab('budgets')}
           >
             <div className="sidebar-btn-content">
               <Target size={18} />
@@ -542,7 +543,7 @@ const Dashboard = () => {
           <button
             type="button"
             className={`sidebar-btn ${activeTab === 'goals' ? 'active' : ''}`}
-            onClick={() => setActiveTab('goals')}
+            onClick={() => goTab('goals')}
           >
             <div className="sidebar-btn-content">
               <PiggyBank size={18} />
@@ -556,7 +557,7 @@ const Dashboard = () => {
           <button
             type="button"
             className={`sidebar-btn ${activeTab === 'trends' ? 'active' : ''}`}
-            onClick={() => setActiveTab('trends')}
+            onClick={() => goTab('trends')}
           >
             <div className="sidebar-btn-content">
               <TrendingUp size={18} />
@@ -574,7 +575,7 @@ const Dashboard = () => {
           <button
             type="button"
             className={`sidebar-btn ${activeTab === 'advisor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('advisor')}
+            onClick={() => goTab('advisor')}
           >
             <div className="sidebar-btn-content">
               <Sparkles size={18} style={{ color: '#A78BFA' }} />
@@ -614,6 +615,14 @@ const Dashboard = () => {
         {/* Top Header */}
         <header className="top-header">
           <div className="header-left">
+            <button
+              type="button"
+              className="btn btn-outline btn-icon hamburger-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open navigation menu"
+            >
+              <Menu size={20} />
+            </button>
             <div className="header-title-block">
               <h1>
                 {activeTab === 'overview' && 'Financial Overview'}
@@ -634,16 +643,6 @@ const Dashboard = () => {
               <span className="status-dot"></span>
               <span>Groq Engine Ready</span>
             </div>
-
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={handleSeedDemo}
-              disabled={demoSeeding}
-              title="Reset sample data for testing"
-            >
-              {demoSeeding ? <Loader2 size={14} className="animate-spin" /> : '⚡ Demo Data'}
-            </button>
 
             <button
               type="button"
@@ -763,7 +762,7 @@ const Dashboard = () => {
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      onClick={() => setActiveTab('expenses')}
+                      onClick={() => goTab('expenses')}
                     >
                       View All <ChevronRight size={14} />
                     </button>
@@ -905,7 +904,7 @@ const Dashboard = () => {
                       <button
                         type="button"
                         className="btn btn-outline btn-sm"
-                        onClick={() => setActiveTab('advisor')}
+                        onClick={() => goTab('advisor')}
                       >
                         All Advice <ChevronRight size={14} />
                       </button>

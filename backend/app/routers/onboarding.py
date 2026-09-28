@@ -1,4 +1,3 @@
-from datetime import date, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import func
@@ -6,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.database.database import get_db
-from app.database.models import Student, Expense, Budget, Goal, Recommendation
+from app.database.models import Student, Recommendation
 from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse
 from app.utils.auth import get_current_student
 
@@ -94,67 +93,6 @@ def get_student_by_email(email: str, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Student with email '{email}' not found.",
         )
-    return student
-
-
-@router.post("/seed-demo", response_model=StudentResponse)
-def seed_demo_student(db: Session = Depends(get_db)):
-    """Seed or re-seed demo student profile (Alex Rivera) with sample data."""
-    demo_email = "alex.rivera@campus.edu"
-    existing = db.query(Student).filter(func.lower(Student.email) == demo_email).first()
-    if existing:
-        db.delete(existing)
-        db.commit()
-
-    student = Student(
-        name="Alex Rivera",
-        email=demo_email,
-        monthly_allowance=850.0,
-        currency="INR",
-        college_year="Sophomore",
-        hashed_password="",
-    )
-    db.add(student)
-    db.commit()
-    db.refresh(student)
-
-    today = date.today()
-    expenses = [
-        Expense(student_id=student.id, title="Campus Dining & Groceries", amount=240.0, category="Food", date=today - timedelta(days=2), payment_method="Card"),
-        Expense(student_id=student.id, title="Computer Science Textbook", amount=135.0, category="Books", date=today - timedelta(days=5), payment_method="UPI"),
-        Expense(student_id=student.id, title="Weekend Cinema & Arcade", amount=85.0, category="Entertainment", date=today - timedelta(days=1), payment_method="Card"),
-        Expense(student_id=student.id, title="Coffee & Study Sessions", amount=35.0, category="Food", date=today, payment_method="Cash"),
-        Expense(student_id=student.id, title="Stationery & Supplies", amount=25.0, category="Books", date=today - timedelta(days=3), payment_method="UPI"),
-    ]
-    for e in expenses:
-        db.add(e)
-
-    budgets = [
-        Budget(student_id=student.id, category="Food", monthly_limit=220.0, month=today.month, year=today.year),
-        Budget(student_id=student.id, category="Entertainment", monthly_limit=90.0, month=today.month, year=today.year),
-        Budget(student_id=student.id, category="Books", monthly_limit=150.0, month=today.month, year=today.year),
-    ]
-    for b in budgets:
-        db.add(b)
-
-    goals = [
-        Goal(student_id=student.id, title="MacBook Upgrade Fund", target_amount=1200.0, current_amount=950.0, deadline=today + timedelta(days=45), status="In Progress"),
-        Goal(student_id=student.id, title="Emergency Savings", target_amount=500.0, current_amount=200.0, deadline=today + timedelta(days=90), status="In Progress"),
-    ]
-    for g in goals:
-        db.add(g)
-
-    rec = Recommendation(
-        student_id=student.id,
-        title="Welcome Alex! 🎯",
-        message="Your demo environment is ready with pre-loaded expenses and budgets.",
-        category="Onboarding",
-        impact_level="Low",
-        is_read=False,
-    )
-    db.add(rec)
-    db.commit()
-    db.refresh(student)
     return student
 
 

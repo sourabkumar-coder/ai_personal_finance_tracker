@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -5,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from app.config import settings
 from app.database.database import get_db
 from app.database.models import Student, Recommendation
 from app.schemas.student import StudentRegister, StudentResponse, TokenResponse, StudentAuthResponse
@@ -60,7 +62,10 @@ def register(student_in: StudentRegister, db: Session = Depends(get_db)) -> Any:
             detail="Failed to register student due to a data conflict.",
         )
 
-    access_token = create_access_token(data={"sub": str(student.id)})
+    access_token = create_access_token(
+        data={"sub": str(student.id)},
+        expires_delta=timedelta(minutes=settings.jwt_access_token_expire_minutes),
+    )
     return {"student": student, "access_token": access_token, "token_type": "bearer"}
 
 
@@ -68,7 +73,21 @@ def register(student_in: StudentRegister, db: Session = Depends(get_db)) -> Any:
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> Any:
     """Login and get access token."""
     student = db.query(Student).filter(func.lower(Student.email) == form_data.username.strip().lower()).first()
-    if not student or not verify_password(form_data.password, student.hashed_password):
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not student.hashed_password:
+        # Legacy password-less account (created before JWT auth): it can never
+        # verify a password, so say so plainly instead of a generic failure.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This account was created before passwords existed. Please register again with a new email.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not verify_password(form_data.password, student.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -76,8 +95,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     if not student.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
-    
-    access_token = create_access_token(data={"sub": str(student.id)})
+
+    access_token = create_access_token(
+        data={"sub": str(student.id)},
+        expires_delta=timedelta(minutes=settings.jwt_access_token_expire_minutes),
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 

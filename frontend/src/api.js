@@ -1,7 +1,54 @@
 const API_BASE =
-  typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-    ? "http://localhost:8000/api"
-    : "https://ai-personal-finance-tracker-7qp8.onrender.com/api";
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL
+    : null)
+  || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000/api'
+    : 'https://ai-personal-finance-tracker-7qp8.onrender.com/api');
+
+const TOKEN_KEY = 'authToken';
+
+export const getToken = () => {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const setToken = (token) => {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // storage unavailable (private mode) — requests simply go unauthenticated
+  }
+};
+
+export const clearAuthStorage = () => {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('student_id');
+  } catch {
+    // ignore
+  }
+};
+
+// Authenticated request helper: attaches Bearer token and bounces to
+// onboarding when the backend reports the session as unauthorized.
+async function request(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (res.status === 401) {
+    clearAuthStorage();
+    if (typeof window !== 'undefined' && window.location.pathname !== '/onboarding') {
+      window.location.href = '/onboarding';
+    }
+  }
+  return res;
+}
 
 // Helper to handle API responses
 const handleResponse = async (res) => {
@@ -21,39 +68,44 @@ const handleResponse = async (res) => {
 };
 
 export const api = {
-  // Onboarding & Profile
-  register: (data) =>
-    fetch(`${API_BASE}/onboarding/register`, {
+  // Auth (public — no token needed yet)
+  authRegister: (data) =>
+    request('/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(handleResponse),
 
+  authLogin: (email, password) =>
+    request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username: email, password }),
+    }).then(handleResponse),
+
+  getMe: () =>
+    request('/auth/me').then(handleResponse),
+
+  // Onboarding & Profile
   getProfile: (studentId) =>
-    fetch(`${API_BASE}/onboarding/profile/${studentId}`).then(handleResponse),
+    request(`/onboarding/profile/${studentId}`).then(handleResponse),
 
   getProfileByEmail: (email) =>
-    fetch(`${API_BASE}/onboarding/profile/by-email/${encodeURIComponent(email)}`).then(handleResponse),
+    request(`/onboarding/profile/by-email/${encodeURIComponent(email)}`).then(handleResponse),
 
   listStudents: (skip = 0, limit = 50) =>
-    fetch(`${API_BASE}/onboarding/students?skip=${skip}&limit=${limit}`).then(handleResponse),
+    request(`/onboarding/students?skip=${skip}&limit=${limit}`).then(handleResponse),
 
   updateProfile: (studentId, data) =>
-    fetch(`${API_BASE}/onboarding/profile/${studentId}`, {
+    request(`/onboarding/profile/${studentId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(handleResponse),
 
   deleteProfile: (studentId) =>
-    fetch(`${API_BASE}/onboarding/profile/${studentId}`, {
+    request(`/onboarding/profile/${studentId}`, {
       method: 'DELETE',
-    }).then(handleResponse),
-
-  seedDemo: () =>
-    fetch(`${API_BASE}/onboarding/seed-demo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
     }).then(handleResponse),
 
   // Expenses
@@ -64,79 +116,79 @@ export const api = {
     if (filters.endDate) params.append('end_date', filters.endDate);
     if (filters.paymentMethod) params.append('payment_method', filters.paymentMethod);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return fetch(`${API_BASE}/expenses/${studentId}${qs}`).then(handleResponse);
+    return request(`/expenses/${studentId}${qs}`).then(handleResponse);
   },
 
   addExpense: (data) =>
-    fetch(`${API_BASE}/expenses/`, {
+    request('/expenses/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(handleResponse),
 
   updateExpense: (expenseId, data) =>
-    fetch(`${API_BASE}/expenses/${expenseId}`, {
+    request(`/expenses/${expenseId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(handleResponse),
 
   deleteExpense: (expenseId) =>
-    fetch(`${API_BASE}/expenses/${expenseId}`, {
+    request(`/expenses/${expenseId}`, {
       method: 'DELETE',
     }).then(handleResponse),
 
   // Budgets
   getBudgets: (studentId) =>
-    fetch(`${API_BASE}/budgets/${studentId}`).then(handleResponse),
+    request(`/budgets/${studentId}`).then(handleResponse),
 
   getBudgetStatuses: (studentId, year = null, month = null) => {
     const params = new URLSearchParams();
     if (year) params.append('year', year);
     if (month) params.append('month', month);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return fetch(`${API_BASE}/budgets/${studentId}/status${qs}`).then(handleResponse);
+    return request(`/budgets/${studentId}/status${qs}`).then(handleResponse);
   },
 
   setBudget: (data) =>
-    fetch(`${API_BASE}/budgets/`, {
+    request('/budgets/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(handleResponse),
 
   deleteBudget: (budgetId) =>
-    fetch(`${API_BASE}/budgets/${budgetId}`, {
+    request(`/budgets/${budgetId}`, {
       method: 'DELETE',
     }).then(handleResponse),
 
   // Goals
   getGoals: (studentId) =>
-    fetch(`${API_BASE}/goals/${studentId}`).then(handleResponse),
+    request(`/goals/${studentId}`).then(handleResponse),
 
   addGoal: (data) =>
-    fetch(`${API_BASE}/goals/`, {
+    request('/goals/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(handleResponse),
 
   depositToGoal: (goalId, amount) =>
-    fetch(`${API_BASE}/goals/${goalId}/deposit`, {
+    request(`/goals/${goalId}/deposit`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount: parseFloat(amount) }),
     }).then(handleResponse),
 
   updateGoal: (goalId, data) =>
-    fetch(`${API_BASE}/goals/${goalId}`, {
+    request(`/goals/${goalId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(handleResponse),
 
   deleteGoal: (goalId) =>
-    fetch(`${API_BASE}/goals/${goalId}`, {
+    request(`/goals/${goalId}`, {
       method: 'DELETE',
     }).then(handleResponse),
 
@@ -146,7 +198,7 @@ export const api = {
     if (year) params.append('year', year);
     if (month) params.append('month', month);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return fetch(`${API_BASE}/analytics/${studentId}/overview${qs}`).then(handleResponse);
+    return request(`/analytics/${studentId}/overview${qs}`).then(handleResponse);
   },
 
   getCategoryBreakdown: (studentId, year = null, month = null) => {
@@ -154,7 +206,7 @@ export const api = {
     if (year) params.append('year', year);
     if (month) params.append('month', month);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return fetch(`${API_BASE}/analytics/${studentId}/by-category${qs}`).then(handleResponse);
+    return request(`/analytics/${studentId}/by-category${qs}`).then(handleResponse);
   },
 
   getTrends: (studentId, year = null, month = null) => {
@@ -162,35 +214,34 @@ export const api = {
     if (year) params.append('year', year);
     if (month) params.append('month', month);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return fetch(`${API_BASE}/analytics/${studentId}/trends${qs}`).then(handleResponse);
+    return request(`/analytics/${studentId}/trends${qs}`).then(handleResponse);
   },
 
   // AI & Recommendations
   getRecommendations: (studentId, unreadOnly = false) =>
-    fetch(`${API_BASE}/recommendations/${studentId}?unread_only=${unreadOnly}`).then(handleResponse),
+    request(`/recommendations/${studentId}?unread_only=${unreadOnly}`).then(handleResponse),
 
   generateRecommendations: (studentId) =>
-    fetch(`${API_BASE}/recommendations/${studentId}/generate`, {
+    request(`/recommendations/${studentId}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     }).then(handleResponse),
 
   getForecast: (studentId) =>
-    fetch(`${API_BASE}/recommendations/${studentId}/forecast`).then(handleResponse),
+    request(`/recommendations/${studentId}/forecast`).then(handleResponse),
 
   markRecommendationRead: (recId) =>
-    fetch(`${API_BASE}/recommendations/${recId}/read`, {
+    request(`/recommendations/${recId}/read`, {
       method: 'PATCH',
     }).then(handleResponse),
 
   markAllRecommendationsRead: (studentId) =>
-    fetch(`${API_BASE}/recommendations/${studentId}/read-all`, {
+    request(`/recommendations/${studentId}/read-all`, {
       method: 'PATCH',
     }).then(handleResponse),
 
   deleteRecommendation: (recId) =>
-    fetch(`${API_BASE}/recommendations/${recId}`, {
+    request(`/recommendations/${recId}`, {
       method: 'DELETE',
     }).then(handleResponse),
 };
-

@@ -1,24 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
-import { Sparkles, UserPlus, LogIn, ArrowRight, Loader2, Mail, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../auth';
+import { Sparkles, UserPlus, LogIn, ArrowRight, Loader2, Mail, ShieldCheck, Lock } from 'lucide-react';
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const { student, authReady, login, register } = useAuth();
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  
+
+  // Already authenticated -> skip onboarding.
+  useEffect(() => {
+    if (authReady && student) navigate('/dashboard', { replace: true });
+  }, [authReady, student, navigate]);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    password: '',
     monthly_allowance: '',
     currency: 'USD',
     college_year: 'Sophomore',
   });
 
   const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -28,17 +35,21 @@ const Onboarding = () => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
-    
+
     try {
-      const data = await api.register({
+      if (!formData.password || formData.password.length < 6) {
+        setErrorMsg('Password must be at least 6 characters.');
+        setLoading(false);
+        return;
+      }
+      await register({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
+        password: formData.password,
         monthly_allowance: parseFloat(formData.monthly_allowance) || 0,
         currency: formData.currency,
         college_year: formData.college_year,
       });
-
-      localStorage.setItem('student_id', data.id);
       navigate('/dashboard');
     } catch (err) {
       setErrorMsg(err.message || 'Registration failed.');
@@ -47,33 +58,21 @@ const Onboarding = () => {
     }
   };
 
-  const handleLoginByEmail = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!loginEmail.trim()) return;
+    if (!loginEmail.trim() || !loginPassword) {
+      setErrorMsg('Please enter both email and password.');
+      return;
+    }
     setLoading(true);
     setErrorMsg('');
     try {
-      const data = await api.getProfileByEmail(loginEmail.trim());
-      localStorage.setItem('student_id', data.id);
+      await login(loginEmail.trim(), loginPassword);
       navigate('/dashboard');
     } catch (err) {
-      setErrorMsg(err.message || 'No account found with this email. Please check spelling or register.');
+      setErrorMsg(err.message || 'Incorrect email or password.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSeedDemo = async () => {
-    setDemoLoading(true);
-    setErrorMsg('');
-    try {
-      const demoStudent = await api.seedDemo();
-      localStorage.setItem('student_id', demoStudent.id);
-      navigate('/dashboard');
-    } catch (err) {
-      setErrorMsg('Failed to initialize demo sandbox: ' + (err.message || 'Unknown error'));
-    } finally {
-      setDemoLoading(false);
     }
   };
 
@@ -94,27 +93,7 @@ const Onboarding = () => {
       </div>
 
       {/* Main Authentication Card */}
-      <div className="card" style={{ width: '100%', maxWidth: '460px', padding: '2rem', borderRadius: 'var(--radius-xl)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-        
-        {/* Sandbox Demo Callout */}
-        <div style={{ padding: '0.875rem 1rem', background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)', border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.8125rem', color: '#4338CA' }}>
-              <Sparkles size={15} /> Sandbox Preview
-            </div>
-            <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.1rem' }}>
-              Test drive with sample student data
-            </p>
-          </div>
-          <button 
-            type="button" 
-            className="btn btn-ai btn-sm" 
-            onClick={handleSeedDemo}
-            disabled={demoLoading || loading}
-          >
-            {demoLoading ? <Loader2 size={13} className="animate-spin" /> : '⚡ Try Demo'}
-          </button>
-        </div>
+      <div className="card auth-card" style={{ width: '100%', borderRadius: 'var(--radius-xl)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
 
         {/* Tab Toggle: Sign In vs Create Account */}
         <div className="segmented-tabs" style={{ marginBottom: '1.5rem' }}>
@@ -144,12 +123,12 @@ const Onboarding = () => {
 
         {/* TAB 1: SIGN IN */}
         {activeTab === 'login' && (
-          <form onSubmit={handleLoginByEmail} className="flex-col gap-4">
+          <form onSubmit={handleLogin} className="flex-col gap-4">
             <div className="form-group">
               <label className="form-label">Email Address</label>
               <div style={{ position: 'relative' }}>
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder="Enter your email (e.g. sourab@gmail.com)"
@@ -161,8 +140,25 @@ const Onboarding = () => {
                 <Mail size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                Enter your email to securely open your personal finances.
+                Enter your email and password to securely open your personal finances.
               </p>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  autoComplete="current-password"
+                  className="input-field"
+                  style={{ paddingLeft: '2.4rem' }}
+                />
+                <Lock size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              </div>
             </div>
 
             <button 
@@ -212,13 +208,28 @@ const Onboarding = () => {
             
             <div className="form-group">
               <label className="form-label">Email Address</label>
-              <input 
-                type="email" 
-                name="email" 
+              <input
+                type="email"
+                name="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="alex@university.edu" 
+                placeholder="alex@university.edu"
+                className="input-field"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password (min 6 characters)</label>
+              <input
+                type="password"
+                name="password"
+                required
+                minLength={6}
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Choose a secure password"
+                autoComplete="new-password"
                 className="input-field"
               />
             </div>
