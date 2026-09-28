@@ -533,7 +533,7 @@ function switchTab(tabId) {
   const headingMap = {
     overview: "Financial Overview",
     trends: "Expense Trends",
-    "ai-advisor": "Groq AI Financial Advisor",
+    "ai-advisor": "AI Financial Advisor",
     expenses: "Itemized Expenses",
     budgets: "Monthly Budgets",
     goals: "Financial Savings Goals",

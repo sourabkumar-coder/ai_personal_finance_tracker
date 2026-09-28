@@ -1489,7 +1489,7 @@ const Dashboard = () => {
                     <Sparkles size={20} className="text-primary" /> AI Financial Advisor & Habits Engine
                   </h2>
                   <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                    Continuous analysis powered by Groq AI heuristics to optimize your student budget.
+                    Continuous analysis powered by Groq AI to optimize your student budget.
                   </p>
                 </div>
 
