@@ -36,23 +36,14 @@ class RecommendationEngine:
         budgets: List[Dict[str, Any]],
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        groq_env = os.environ.get("GROQ_API_KEY") or getattr(settings, "groq_api_key", "")
-        gemini_env = os.environ.get("GEMINI_API_KEY") or getattr(settings, "gemini_api_key", "")
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key and settings and hasattr(settings, "groq_api_key"):
+            api_key = settings.groq_api_key
 
-        # If test monkeypatched GEMINI_API_KEY or GROQ_API_KEY to empty or invalid, skip live AI calls to test rule-based fallbacks
-        if gemini_env == "" or groq_env == "" or (gemini_env and "invalid" in str(gemini_env).lower()) or (groq_env and "invalid" in str(groq_env).lower()):
-            active_groq_key = None
-            active_gemini_key = None
-        else:
-            active_groq_key = groq_env if (groq_env and groq_env.strip().startswith("gsk_")) else (gemini_env if (gemini_env and gemini_env.strip().startswith("gsk_")) else None)
-            if active_groq_key and "invalid" in active_groq_key.lower():
-                active_groq_key = None
-            active_gemini_key = gemini_env if (gemini_env and gemini_env.strip() and not gemini_env.strip().startswith("gsk_") and gemini_env.strip() != "your_gemini_api_key_here") else None
-
-        if active_groq_key:
+        if api_key and api_key.strip() and "invalid" not in api_key.lower() and api_key.strip() not in ["your_groq_api_key_here", "your_api_key_here"]:
             try:
                 groq_recs = cls._generate_groq_recommendations(
-                    api_key=active_groq_key.strip(),
+                    api_key=api_key.strip(),
                     student_data=student_data,
                     expenses=expenses,
                     budgets=budgets,
@@ -62,20 +53,6 @@ class RecommendationEngine:
                     return groq_recs
             except Exception as e:
                 logger.warning(f"Groq API recommendation error: {e}. Falling back to rule-based engine.")
-
-        if active_gemini_key:
-            try:
-                gemini_recs = cls._generate_gemini_recommendations(
-                    api_key=active_gemini_key.strip(),
-                    student_data=student_data,
-                    expenses=expenses,
-                    budgets=budgets,
-                    goals=goals,
-                )
-                if gemini_recs and len(gemini_recs) > 0:
-                    return gemini_recs
-            except Exception as e:
-                logger.warning(f"Gemini API recommendation error: {e}. Falling back to rule-based engine.")
 
         # Fallback to heuristic rule engine
         return cls._generate_rule_based_recommendations(
