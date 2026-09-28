@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Any, Dict, Optional
 
 import httpx
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.models import SmsAlertLog
@@ -143,14 +144,20 @@ class SmsService:
             if not SmsService._send_via_textbee(message, cfg):
                 return {"sent": False, "reason": "send_failed"}
 
-            db.add(SmsAlertLog(
-                student_id=student_id,
-                category=category,
-                level=level,
-                year=target_year,
-                month=target_month,
-            ))
-            db.commit()
+            try:
+                db.add(SmsAlertLog(
+                    student_id=student_id,
+                    category=category,
+                    level=level,
+                    year=target_year,
+                    month=target_month,
+                ))
+                db.commit()
+            except IntegrityError:
+                # Lost a race with a concurrent request that already sent and
+                # logged this alert: the SMS went out, just don't record twice.
+                db.rollback()
+                return {"sent": True, "reason": "duplicate_race"}
             logger.info("Budget SMS sent (%s/%s) to %s.", category, level, cfg["recipient"])
             return {"sent": True, "reason": "sent"}
         except Exception as exc:  # never break expense logging because of SMS

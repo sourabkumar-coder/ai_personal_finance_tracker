@@ -22,6 +22,19 @@ let currencySymbol = "₹";
 let previousExpenseCount = 0;
 let pollingInterval = null;
 let authToken = localStorage.getItem("authToken") || null;
+// Guards the session-expired UX so one expiry produces one prompt, not one per request.
+let sessionExpiredNotified = false;
+
+function stopPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+}
+
+function resetSessionExpiredFlag() {
+  sessionExpiredNotified = false;
+}
 
 async function apiFetch(endpoint, options = {}) {
   const headers = { ...options.headers };
@@ -36,8 +49,12 @@ async function apiFetch(endpoint, options = {}) {
   if (res.status === 401) {
     authToken = null;
     localStorage.removeItem("authToken");
-    showLoginScreen();
-    showToast("Session Expired", "Please login again.", "error");
+    stopPolling();
+    if (!sessionExpiredNotified) {
+      sessionExpiredNotified = true;
+      showLoginScreen();
+      showToast("Session Expired", "Please login again.", "error");
+    }
   }
   return res;
 }
@@ -84,6 +101,8 @@ async function initApp() {
       updateSidebarProfile();
       loadAllViews();
       hideLoginScreen();
+      resetSessionExpiredFlag();
+      setupPolling();
     } else {
       showLoginScreen();
     }
@@ -166,26 +185,11 @@ async function handleLoginStudent(event) {
       body: formData,
     });
 
-    if (res.status === 404) {
-      res = await apiFetch(`${API_BASE}/api/onboarding/profile/by-email/${encodeURIComponent(email)}`);
-      if (res.ok) {
-        const student = await res.json();
-        currentStudentId = student.id;
-        currentStudent = student;
-        localStorage.setItem("activeStudentId", currentStudentId);
-        showAuthAlert("Login successful! Redirecting...", "success");
-        showToast("Welcome Back!", `Logged in as ${student.name}`, "success");
-        setTimeout(async () => {
-          await initApp();
-        }, 400);
-        return;
-      }
-    }
-
     if (res.ok) {
       const data = await res.json();
       authToken = data.access_token;
       localStorage.setItem("authToken", authToken);
+      resetSessionExpiredFlag();
       if (data.student && data.student.id) {
         currentStudentId = data.student.id;
         localStorage.setItem("activeStudentId", currentStudentId);
@@ -194,6 +198,7 @@ async function handleLoginStudent(event) {
       showAuthAlert("Login successful! Redirecting...", "success");
       showToast("Welcome Back!", "Logged in successfully.", "success");
 
+      setupPolling();
       setTimeout(async () => {
         await initApp();
       }, 400);
@@ -254,39 +259,13 @@ async function handleRegisterStudent(event) {
       body: JSON.stringify(payload),
     });
 
-    if (res.status === 404) {
-      const onboardingPayload = {
-        name,
-        email,
-        monthly_allowance: allowance,
-        college_year: year,
-        currency: "INR"
-      };
-      res = await apiFetch(`${API_BASE}/api/onboarding/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(onboardingPayload),
-      });
-      if (res.ok) {
-        const student = await res.json();
-        currentStudentId = student.id;
-        currentStudent = student;
-        localStorage.setItem("activeStudentId", currentStudentId);
-        showAuthAlert("Account created successfully!", "success");
-        showToast("Registration Complete", `Welcome ${name}!`, "success");
-        setTimeout(async () => {
-          await initApp();
-        }, 400);
-        return;
-      }
-    }
-
     if (res.ok) {
       const data = await res.json();
       if (data.access_token) {
         authToken = data.access_token;
         localStorage.setItem("authToken", authToken);
       }
+      resetSessionExpiredFlag();
       if (data.student && data.student.id) {
         currentStudentId = data.student.id;
         localStorage.setItem("activeStudentId", currentStudentId);
@@ -298,6 +277,7 @@ async function handleRegisterStudent(event) {
       showAuthAlert("Account created successfully!", "success");
       showToast("Registration Complete", "Welcome to SmartFinance AI!", "success");
 
+      setupPolling();
       setTimeout(async () => {
         await initApp();
       }, 400);
@@ -325,6 +305,8 @@ function logoutStudent() {
   currentStudentId = 0;
   localStorage.removeItem("authToken");
   localStorage.removeItem("activeStudentId");
+  stopPolling();
+  resetSessionExpiredFlag();
   showLoginScreen();
   showToast("Logged Out", "You have been safely logged out.", "info");
 }
@@ -390,6 +372,7 @@ window.updateSidebarProfile = updateSidebarProfile;
 function setupPolling() {
   if (pollingInterval) clearInterval(pollingInterval);
   pollingInterval = setInterval(async () => {
+    if (!authToken) return;
     if (!currentStudentId || currentStudentId <= 0) return;
     await checkNewTransactions();
   }, 4000);

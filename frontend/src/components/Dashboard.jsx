@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import {
   ResponsiveContainer,
   PieChart,
@@ -65,6 +66,7 @@ const CATEGORY_ICONS = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const studentId = localStorage.getItem('student_id');
   const toastIdRef = useRef(0);
 
@@ -81,7 +83,6 @@ const Dashboard = () => {
   // Global loading
   const [loading, setLoading] = useState(true);
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [demoSeeding, setDemoSeeding] = useState(false);
 
   // App Data
   const [profile, setProfile] = useState(null);
@@ -148,9 +149,9 @@ const Dashboard = () => {
   const [recFilterImpact, setRecFilterImpact] = useState('ALL'); // ALL, High, Medium, Low
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('student_id');
+    logout();
     navigate('/onboarding');
-  }, [navigate]);
+  }, [navigate, logout]);
 
   // Main Data Fetcher
   const fetchAllData = useCallback(async () => {
@@ -219,21 +220,6 @@ const Dashboard = () => {
       isCancelled = true;
     };
   }, [studentId, navigate, fetchAllData]);
-
-  // 1-Click Seed Demo
-  const handleSeedDemo = async () => {
-    setDemoSeeding(true);
-    try {
-      const demo = await api.seedDemo();
-      localStorage.setItem('student_id', demo.id);
-      addToast('Demo account (Alex Rivera) refreshed with live data!');
-      await fetchAllData();
-    } catch (err) {
-      addToast('Failed to seed demo: ' + err.message, 'error');
-    } finally {
-      setDemoSeeding(false);
-    }
-  };
 
   // Add Expense
   const handleAddExpense = async (e) => {
@@ -657,16 +643,6 @@ const Dashboard = () => {
               <span className="status-dot"></span>
               <span>Gemini Engine Ready</span>
             </div>
-
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={handleSeedDemo}
-              disabled={demoSeeding}
-              title="Reset sample data for testing"
-            >
-              {demoSeeding ? <Loader2 size={14} className="animate-spin" /> : '⚡ Demo Data'}
-            </button>
 
             <button
               type="button"
