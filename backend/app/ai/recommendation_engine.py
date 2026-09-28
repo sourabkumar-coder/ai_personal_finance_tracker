@@ -75,15 +75,26 @@ class RecommendationEngine:
         budgets: List[Dict[str, Any]],
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        configured_model = getattr(settings, "groq_model", "openai/gpt-oss-20b") or "openai/gpt-oss-20b"
-        models_to_try = [configured_model, "openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]
+        configured_model = getattr(settings, "groq_model", "llama-3.3-70b-versatile") or "llama-3.3-70b-versatile"
+        models_to_try = list(dict.fromkeys([
+            configured_model,
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "llama3-70b-8192",
+            "llama3-8b-8192",
+            "mixtral-8x7b-32768",
+            "gemma2-9b-it",
+        ]))
 
         allowance = float(student_data.get("monthly_allowance") or 0.0)
         currency = str(student_data.get("currency") or "INR")
         student_name = str(student_data.get("name") or "Student")
         total_spent = sum(float(e.get("amount") or 0.0) for e in expenses)
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         financial_context = {
+            "request_timestamp": now_str,
             "student_name": student_name,
             "monthly_allowance": f"{currency} {allowance:,.2f}",
             "total_spent_this_month": f"{currency} {total_spent:,.2f}",
@@ -117,8 +128,10 @@ class RecommendationEngine:
 
         prompt = f"""
 You are an expert AI financial advisor dedicated to college students and young adults.
-Analyze this student's real financial status and generate 3 to 5 highly personalized, encouraging, and actionable financial recommendations:
+Analyze this student's real financial status and generate 3 to 5 fresh, creative, highly personalized, encouraging, and actionable financial recommendations.
+Every time you generate advice, provide diverse insights covering spending habits, smart saving tricks, and budget optimization.
 
+Timestamp / Context ID: {now_str}
 Financial Data:
 {json.dumps(financial_context, indent=2)}
 
@@ -143,7 +156,7 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
             payload = {
                 "model": model,
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.4,
+                "temperature": 0.7,
             }
             try:
                 with httpx.Client(timeout=12.0) as client:
@@ -183,6 +196,8 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
                 logger.warning(f"Error invoking Groq model {model}: {e}")
                 continue
 
+        return []
+
     @classmethod
     def _generate_rule_based_recommendations(
         cls,
@@ -191,6 +206,7 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
         budgets: List[Dict[str, Any]],
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
+        import random
         recommendations = []
         allowance = float(student_data.get("monthly_allowance") or 0.0)
         total_spent = sum(float(e.get("amount") or 0.0) for e in expenses)
@@ -278,17 +294,45 @@ Return ONLY a JSON array containing recommendation objects with this exact schem
                         "impact_level": "Low",
                     })
 
-        # Rule 5: Default positive advice if on good track
-        if not recommendations:
-            recommendations.append({
+        # Rule 5: Dynamic Advice Pool (Rotates fresh tips if no urgent warnings)
+        advice_pool = [
+            {
                 "title": "Great Financial Health 🌱",
-                "message": (
-                    "Your spending is well within your budget limits and savings pace. "
-                    "Keep building your emergency fund!"
-                ),
+                "message": "Your spending is well within your budget limits and savings pace. Keep building your emergency fund!",
                 "category": "General",
                 "impact_level": "Low",
-            })
+            },
+            {
+                "title": "50/30/20 Student Rule 💡",
+                "message": "Aim for 50% Needs (Rent/Mess), 30% Wants (Outings), and 20% Savings for semester goals.",
+                "category": "Education",
+                "impact_level": "Low",
+            },
+            {
+                "title": "Unused Subscription Check 🔍",
+                "message": "Audit active OTT, music, or AI app subscriptions. Canceling just one unused app saves up to ₹3,000/year!",
+                "category": "Subscriptions",
+                "impact_level": "Low",
+            },
+            {
+                "title": "Student Discount Hacks 🎓",
+                "message": "Use your college ID for discounts on Spotify, Apple Music, laptop software, and transit passes!",
+                "category": "Shopping",
+                "impact_level": "Low",
+            },
+            {
+                "title": "Automate Micro-Savings 🪙",
+                "message": "Try rounding up daily expenses to the nearest ₹50 and moving the spare change straight into your savings goal.",
+                "category": "Savings",
+                "impact_level": "Low",
+            },
+        ]
+
+        if not recommendations:
+            recommendations = random.sample(advice_pool, 2)
+        elif len(recommendations) == 1:
+            bonus_tips = [t for t in advice_pool if t["category"] != recommendations[0].get("category")]
+            recommendations.append(random.choice(bonus_tips))
 
         return recommendations
 

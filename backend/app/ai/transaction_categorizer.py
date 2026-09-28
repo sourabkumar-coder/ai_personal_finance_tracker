@@ -286,7 +286,7 @@ class TransactionCategorizer:
         description: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Use Groq Llama3/GPT models to categorize unseen merchants."""
-        model = getattr(settings, "groq_model", "openai/gpt-oss-20b") or "openai/gpt-oss-20b"
+        model = getattr(settings, "groq_model", "llama-3.3-70b-versatile") or "llama-3.3-70b-versatile"
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key.strip()}",
