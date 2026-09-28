@@ -37,17 +37,12 @@ class RecommendationEngine:
         goals: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         groq_env = os.environ.get("GROQ_API_KEY") or getattr(settings, "groq_api_key", "")
-        gemini_env = os.environ.get("GEMINI_API_KEY") or getattr(settings, "gemini_api_key", "")
 
-        # If test monkeypatched GEMINI_API_KEY or GROQ_API_KEY to empty or invalid, skip live AI calls to test rule-based fallbacks
-        if gemini_env == "" or groq_env == "" or (gemini_env and "invalid" in str(gemini_env).lower()) or (groq_env and "invalid" in str(groq_env).lower()):
+        # If test monkeypatched GROQ_API_KEY to empty or invalid, skip live AI calls to test rule-based fallbacks
+        if groq_env == "" or (groq_env and "invalid" in str(groq_env).lower()) or (groq_env and str(groq_env).strip() in ["your_groq_api_key_here", "your_api_key_here"]):
             active_groq_key = None
-            active_gemini_key = None
         else:
-            active_groq_key = groq_env if (groq_env and groq_env.strip().startswith("gsk_")) else (gemini_env if (gemini_env and gemini_env.strip().startswith("gsk_")) else None)
-            if active_groq_key and "invalid" in active_groq_key.lower():
-                active_groq_key = None
-            active_gemini_key = gemini_env if (gemini_env and gemini_env.strip() and not gemini_env.strip().startswith("gsk_") and gemini_env.strip() != "your_gemini_api_key_here") else None
+            active_groq_key = groq_env.strip() if groq_env and groq_env.strip() else None
 
         if active_groq_key:
             try:
