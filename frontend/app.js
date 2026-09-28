@@ -259,6 +259,14 @@ async function handleRegisterStudent(event) {
       body: JSON.stringify(payload),
     });
 
+    if (res.status === 404) {
+      res = await apiFetch(`${API_BASE}/api/onboarding/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+
     if (res.ok) {
       const data = await res.json();
       if (data.access_token) {

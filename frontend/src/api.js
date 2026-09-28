@@ -69,12 +69,21 @@ const handleResponse = async (res) => {
 
 export const api = {
   // Auth (public — no token needed yet)
-  authRegister: (data) =>
-    request('/auth/register', {
+  authRegister: async (data) => {
+    let res = await request('/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
-    }).then(handleResponse),
+    });
+    if (res.status === 404) {
+      res = await request('/onboarding/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    }
+    return handleResponse(res);
+  },
 
   authLogin: (email, password) =>
     request('/auth/login', {
