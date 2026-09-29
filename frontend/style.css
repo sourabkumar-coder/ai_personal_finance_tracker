@@ -563,11 +563,11 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
 
 .ai-hero-content {
   max-width: 650px;
-  flex: 1;
+  flex: 1 1 280px;
 }
 
 .ai-hero-content h2 {
-  font-size: 1.4rem;
+  font-size: clamp(1.15rem, 3.5vw, 1.4rem);
   font-weight: 700;
   color: var(--text-main);
   margin-bottom: 0.4rem;
@@ -578,6 +578,7 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
   font-size: 0.9rem;
   font-weight: 400;
   margin-bottom: 0.85rem;
+  line-height: 1.45;
 }
 
 .ai-hero-action {
@@ -585,6 +586,7 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
   align-items: center;
   justify-content: flex-end;
   flex-shrink: 0;
+  width: auto;
 }
 
 /* Tag & Pill Backgrounds (#EBE6E3 Warm Taupe Tint) */
@@ -621,7 +623,7 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
 /* Recommendations Grid */
 .recs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 1.25rem;
 }
 
@@ -635,6 +637,8 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
   justify-content: space-between;
   transition: var(--transition-normal);
   box-shadow: var(--shadow-sm);
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .rec-card:hover {
@@ -1125,7 +1129,13 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
     margin-bottom: 1.25rem;
   }
   .ai-hero-banner {
-    padding: 1.25rem;
+    padding: 1rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ai-hero-action {
+    width: 100%;
+    margin-top: 0.75rem;
   }
   .ai-hero-banner .btn {
     width: 100%;
