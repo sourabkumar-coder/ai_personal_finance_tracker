@@ -1022,47 +1022,87 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
   .sidebar {
     width: 100%;
     height: auto;
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.5rem 0.75rem;
   }
   .nav-links {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.4rem;
+    padding-bottom: 0.25rem;
+  }
+  .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-item button {
+    white-space: nowrap;
+    min-height: 44px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
   }
   .user-profile-card {
     display: none;
   }
   .top-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
     padding: 0.75rem 1rem;
   }
   .header-actions {
-    width: 100%;
+    width: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
   }
 }
 
-/* Phone portrait (360-480px): stack header, single-column forms, fluid sheets */
+/* Phone portrait (320-480px): stack header cleanly without overlaps */
 @media (max-width: 480px) {
   .top-header {
     height: auto;
-    min-height: 68px;
+    min-height: 60px;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.6rem;
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 0.85rem;
   }
   .page-title h1 {
     font-size: 1.1rem;
+    line-height: 1.3;
   }
   .header-actions {
     width: 100%;
+    display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.4rem;
+  }
+  .header-actions .btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
   }
   .ai-status-pill {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    padding: 0.35rem 0.65rem;
   }
 
   .content-body {
