@@ -1148,12 +1148,20 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
   .form-control {
     font-size: 16px; /* prevents iOS auto-zoom on focus */
   }
+  .modal-backdrop {
+    padding: 0.75rem;
+  }
   .modal-window {
-    padding: 1.25rem;
-    width: calc(100vw - 2rem);
+    padding: 1.15rem;
+    width: 100%;
+    max-width: calc(100vw - 1.5rem);
+    max-height: 90dvh;
+    overflow-y: auto;
+    box-sizing: border-box;
   }
   .modal-actions {
     flex-direction: column-reverse;
+    gap: 0.5rem;
   }
   .modal-actions .btn {
     width: 100%;
