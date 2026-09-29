@@ -1023,6 +1023,11 @@ p, span, .metric-subtext, .metric-label, .rec-msg, .data-table td, .progress-met
   .app-shell {
     flex-direction: column;
   }
+  .main-viewport {
+    max-height: none;
+    min-width: 0;
+    width: 100%;
+  }
   .sidebar {
     width: 100%;
     height: auto;
